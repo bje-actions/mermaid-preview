@@ -53,6 +53,11 @@ or anywhere else, and the action has no network call except to the GitHub API. W
 `type: image` the comment embeds `https://mermaid.ink/img/pako:<state>`, the same encoded
 state, and the viewer's browser fetches the render; the action still does not.
 
+A single image cannot follow the reader's light or dark mode, so the image is a `<picture>`
+with a `prefers-color-scheme: dark` source rendered on Mermaid's `dark` theme and an `<img>`
+rendered on the `theme` input, each with its own optional `bgColor`. GitHub keeps this markup
+in comments (probed on PR #10) and serves both renders through its image proxy.
+
 ## Follow-ups not yet built
 
 - A moved or re-indented block reads as changed and gets a comment with a link identical to

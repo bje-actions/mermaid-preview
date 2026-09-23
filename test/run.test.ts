@@ -21,6 +21,7 @@ const SAME_REPO = {
   type: 'link',
   attribution: true,
   background: '',
+  backgroundDark: '',
   allowReadOnly: false,
 } as const;
 const FORK = {
@@ -28,6 +29,7 @@ const FORK = {
   type: 'link',
   attribution: true,
   background: '',
+  backgroundDark: '',
   allowReadOnly: true,
 } as const;
 const denied = () =>

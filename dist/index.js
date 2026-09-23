@@ -37699,17 +37699,33 @@ function keyOf(body) {
 }
 function buildBody(key, code, options) {
     const links = previewLinks(code, options.theme);
-    const background = options.background.replace(/^#/, '');
-    const image = background === '' ? links.image : `${links.image}?bgColor=${encodeURIComponent(background)}`;
     const lines = [
         marker(key),
         options.type === 'image'
-            ? `[![Mermaid diagram](${image})](${links.edit})`
+            ? picture(code, options, links)
             : `Preview this diagram on mermaid.live: [view](${links.view}) or [edit](${links.edit}).`,
     ];
     if (options.attribution)
         lines.push('', FOOTER);
     return lines.join('\n');
+}
+/**
+ * A theme-aware image linked to the editor. GitHub keeps a `<picture>` with a
+ * `prefers-color-scheme: dark` source in comments (probed on PR #10), so dark
+ * mode readers get a render on Mermaid's dark theme, light mode readers the
+ * `theme` input's render, each with its own optional background.
+ */
+function picture(code, options, links) {
+    const withBackground = (url, background) => {
+        const color = background.replace(/^#/, '');
+        return color === '' ? url : `${url}?bgColor=${encodeURIComponent(color)}`;
+    };
+    const dark = withBackground(previewLinks(code, 'dark').image, options.backgroundDark);
+    const light = withBackground(links.image, options.background);
+    return (`<a href="${links.edit}"><picture>` +
+        `<source media="(prefers-color-scheme: dark)" srcset="${dark}">` +
+        `<img alt="Mermaid diagram" src="${light}">` +
+        '</picture></a>');
 }
 /** The body without its marker and footer: what a job summary line shows. */
 function bodyText(body) {
@@ -37878,6 +37894,7 @@ async function main() {
         type: type,
         attribution: getBooleanInput('attribution'),
         background: getInput('background'),
+        backgroundDark: getInput('background-dark'),
         allowReadOnly: headRepo !== undefined && headRepo !== `${ref.owner}/${ref.repo}`,
     }, core_namespaceObject);
     if (result.summary.length > 0) {

@@ -15,7 +15,15 @@ const ADDED = [
   '+tail',
 ].join('\n');
 const KEY = 'docs/a.md#0';
-const LINK = { theme: 'default', type: 'link', attribution: true, background: '' } as const;
+const LINK = {
+  theme: 'default',
+  type: 'link',
+  attribution: true,
+  background: '',
+  backgroundDark: '',
+} as const;
+const PAKO_LIGHT = PAKO['graph TD\n  a --> b|default'];
+const PAKO_DARK = PAKO['graph TD\n  a --> b|dark'];
 const BODY = body(KEY, PAKO['graph TD\n  a --> b|default']);
 
 function file(over: Partial<ChangedFile> = {}): ChangedFile {
@@ -40,30 +48,39 @@ describe('plan', () => {
     const [created] = plan([file()], [], LINK).create;
     expect(created?.body.endsWith(`\n\n${FOOTER}`)).toBe(true);
     expect(plan([file()], [], { ...LINK, attribution: false }).create[0]?.body).toBe(
-      body(KEY, PAKO['graph TD\n  a --> b|default'], 'link', false),
+      body(KEY, PAKO_LIGHT, { attribution: false }),
     );
   });
 
-  it('comments with the rendered image linked to the editor when type is image', () => {
+  it('comments with a theme-aware picture linked to the editor when type is image', () => {
     expect(plan([file()], [], { ...LINK, type: 'image' }).create).toEqual([
       {
         key: KEY,
         path: 'docs/a.md',
         startLine: 2,
         line: 5,
-        body: body(KEY, PAKO['graph TD\n  a --> b|default'], 'image'),
+        body: body(KEY, PAKO_LIGHT, { type: 'image', pakoDark: PAKO_DARK }),
       },
     ]);
   });
 
-  it('adds the background to the image URL only, without a leading hash', () => {
-    const pako = PAKO['graph TD\n  a --> b|default'];
-    const image = { ...LINK, type: 'image', background: '#1e1e1e' } as const;
+  it('adds each background to its own image render only, without a leading hash', () => {
+    const image = {
+      ...LINK,
+      type: 'image',
+      background: '#ffffff',
+      backgroundDark: '0d1117',
+    } as const;
     expect(plan([file()], [], image).create[0]?.body).toBe(
-      body(KEY, pako, 'image', true, '1e1e1e'),
+      body(KEY, PAKO_LIGHT, {
+        type: 'image',
+        pakoDark: PAKO_DARK,
+        background: 'ffffff',
+        backgroundDark: '0d1117',
+      }),
     );
-    const link = { ...LINK, background: '1e1e1e' } as const;
-    expect(plan([file()], [], link).create[0]?.body).toBe(body(KEY, pako));
+    const link = { ...LINK, background: 'ffffff', backgroundDark: '0d1117' } as const;
+    expect(plan([file()], [], link).create[0]?.body).toBe(body(KEY, PAKO_LIGHT));
   });
 
   it('encodes the theme into the link', () => {
