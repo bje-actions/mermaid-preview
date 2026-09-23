@@ -2,8 +2,8 @@ name: 'Mermaid preview'
 description: "Comments a mermaid.live preview link on each changed mermaid block in pull request Markdown."
 author: 'brianespinosa'
 branding:
-  icon: 'git-pull-request'
-  color: 'purple'
+  icon: 'eye'
+  color: 'blue'
 inputs:
   token:
     description: 'Token for the pull request API calls. Needs pull-requests: write. The default GITHUB_TOKEN is enough for same-repository pull requests.'
