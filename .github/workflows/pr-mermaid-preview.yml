@@ -1,0 +1,28 @@
+name: Mermaid preview
+
+# The workflow an org or enterprise ruleset requires on every pull request
+# (rule type "workflows", see rulesets/). A ruleset ignores the file's own
+# event filters and runs it on every pull request, so there is no paths
+# filter here: a pull request with no Markdown plans nothing and exits 0.
+#
+# pull_request_target, not pull_request: a fork pull request then gets a
+# token that can write review comments. Safe here because the action never
+# checks out or runs pull request content; it reads files through the API.
+# merge_group is accepted so a merge queue is not blocked, and skipped.
+on:
+  pull_request_target:
+  merge_group:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    name: Comment mermaid previews
+    if: github.event_name != 'merge_group'
+    # One bundled JS action and no checkout: the smallest runner is plenty.
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - uses: bje-actions/mermaid-preview@v1

@@ -1,0 +1,26 @@
+{
+  "name": "Mermaid preview",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "organization_name": { "include": ["~ALL"], "exclude": [] },
+    "repository_name": { "include": ["~ALL"], "exclude": ["mermaid-preview"] },
+    "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] }
+  },
+  "rules": [
+    {
+      "type": "workflows",
+      "parameters": {
+        "do_not_enforce_on_create": true,
+        "workflows": [
+          {
+            "repository_id": 1382713802,
+            "path": ".github/workflows/pr-mermaid-preview.yml",
+            "ref": "refs/heads/main"
+          }
+        ]
+      }
+    }
+  ]
+}
