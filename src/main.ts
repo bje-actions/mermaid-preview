@@ -1,7 +1,7 @@
 import * as core from '@actions/core';
 import { context } from '@actions/github';
 import { createClient, headShaOf, messageOf } from './github';
-import { COMMENT_TYPES, type CommentType } from './plan';
+import { COMMENT_TYPES, isCommentType } from './plan';
 import { run } from './run';
 
 async function main(): Promise<void> {
@@ -15,20 +15,26 @@ async function main(): Promise<void> {
   if (!Number.isInteger(number) || number <= 0) {
     throw new Error(`pr-number must be a positive integer, got '${input}'`);
   }
+  // Every input is checked before the first API call, so a bad value fails
+  // on its own message rather than behind an auth or network error.
+  const type = core.getInput('type') || 'image';
+  if (!isCommentType(type)) {
+    throw new Error(`type must be one of ${COMMENT_TYPES.join(', ')}, got '${type}'`);
+  }
+  const attribution = (core.getInput('attribution') || 'true').toLowerCase();
+  if (attribution !== 'true' && attribution !== 'false') {
+    throw new Error(`attribution must be true or false, got '${core.getInput('attribution')}'`);
+  }
   const ref = { owner: context.repo.owner, repo: context.repo.repo, number };
   const headSha: string = event?.number === number ? event.head.sha : await headShaOf(token, ref);
   const headRepo: string | undefined = event?.head?.repo?.full_name;
-  const type = core.getInput('type') || 'image';
-  if (!(COMMENT_TYPES as readonly string[]).includes(type)) {
-    throw new Error(`type must be one of ${COMMENT_TYPES.join(', ')}, got '${type}'`);
-  }
   const client = createClient(token, { ...ref, headSha });
   const result = await run(
     client,
     {
       theme: core.getInput('theme') || 'default',
-      type: type as CommentType,
-      attribution: core.getBooleanInput('attribution'),
+      type,
+      attribution: attribution === 'true',
       allowReadOnly: headRepo !== undefined && headRepo !== `${ref.owner}/${ref.repo}`,
     },
     core,

@@ -9,5 +9,5 @@
 - `markdown.ts` (fence finder), `diff.ts` (patch parsing, changed-within, anchor range),
   `encode.ts` (the `pako:` state encoding mermaid.live and mermaid.ink read).
 - `../dist/index.js`: the ncc bundle consumers run. Committed; the lefthook `build` step rebuilds
-  it on every commit that touches `src/`, `package.json` or `pnpm-lock.yaml`, and CI fails when
+  it on every commit that touches `src/*.ts`, `package.json` or `pnpm-lock.yaml`, and CI fails when
   it does not match `src/`.

@@ -94,10 +94,14 @@ jobs:
         id: smoke
         uses: ./
 
-      - name: The smoke test must have completed
+      - name: The smoke test must have completed, with a comment when the fixture changed
         env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
           OUTCOME: ${{ steps.smoke.outputs.outcome }}
           COMMENTS: ${{ steps.smoke.outputs.comments }}
         run: |
-          echo "outcome=${OUTCOME} comments=${COMMENTS}"
+          expected=$(gh pr diff "$PR" --name-only | grep -c '^test/fixtures/sample.md$' || true)
+          echo "outcome=${OUTCOME} comments=${COMMENTS} expected=${expected}"
           test "$OUTCOME" = "completed"
+          test "$COMMENTS" = "$expected"

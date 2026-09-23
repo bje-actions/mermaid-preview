@@ -62,27 +62,27 @@ describe('changedWithin', () => {
 describe('anchorRange', () => {
   const diff = parsePatch(PATCH);
   it('is the whole range when every line is in a hunk', () => {
-    expect(anchorRange({ start: 1, end: 4 }, diff)).toEqual({ start: 1, end: 4, partial: false });
+    expect(anchorRange({ start: 1, end: 4 }, diff)).toEqual({ start: 1, end: 4 });
   });
-  it('is partial when a single run misses either end of the range', () => {
-    expect(anchorRange({ start: 5, end: 9 }, diff)).toEqual({ start: 7, end: 9, partial: true });
-    expect(anchorRange({ start: 1, end: 6 }, diff)).toEqual({ start: 1, end: 4, partial: true });
+  it('is the single run when it misses either end of the range', () => {
+    expect(anchorRange({ start: 5, end: 9 }, diff)).toEqual({ start: 7, end: 9 });
+    expect(anchorRange({ start: 1, end: 6 }, diff)).toEqual({ start: 1, end: 4 });
   });
   it('picks the in-hunk run with the most changed lines, wherever it is', () => {
     // 1-4 holds two changes (added 2, deletion at 3); 7-9 holds one.
-    expect(anchorRange({ start: 1, end: 9 }, diff)).toEqual({ start: 1, end: 4, partial: true });
+    expect(anchorRange({ start: 1, end: 9 }, diff)).toEqual({ start: 1, end: 4 });
     // Later run wins with two additions against one.
     const later = parsePatch(['@@ -1 +1 @@', '+a', '@@ -5,2 +5,3 @@', ' e', '+f', '+g'].join('\n'));
-    expect(anchorRange({ start: 1, end: 7 }, later)).toEqual({ start: 5, end: 7, partial: true });
+    expect(anchorRange({ start: 1, end: 7 }, later)).toEqual({ start: 5, end: 7 });
     // Later run wins through a deletion alone.
     const del = parsePatch(
       ['@@ -1 +1 @@', ' a', '@@ -5,3 +5,2 @@', ' e', '-x', '-y', ' f'].join('\n'),
     );
-    expect(anchorRange({ start: 1, end: 6 }, del)).toEqual({ start: 5, end: 6, partial: true });
+    expect(anchorRange({ start: 1, end: 6 }, del)).toEqual({ start: 5, end: 6 });
   });
   it('prefers the earlier run on a tie', () => {
     const tie = parsePatch(['@@ -1 +1 @@', '+a', '@@ -5 +5 @@', '+e'].join('\n'));
-    expect(anchorRange({ start: 1, end: 5 }, tie)).toEqual({ start: 1, end: 1, partial: true });
+    expect(anchorRange({ start: 1, end: 5 }, tie)).toEqual({ start: 1, end: 1 });
   });
   it('is null when no line is in the diff', () => {
     expect(anchorRange({ start: 5, end: 6 }, diff)).toBeNull();

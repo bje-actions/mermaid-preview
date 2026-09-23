@@ -1,7 +1,6 @@
 import { isPermissionDenied, messageOf, type PullRequestClient, statusOf } from './github';
 import {
   type BodyOptions,
-  bodyText,
   type ChangedFile,
   type DesiredComment,
   isMarkdown,
@@ -88,7 +87,7 @@ export async function run(
     );
     for (const comment of [...planned.update, ...planned.create]) {
       summary.push(
-        `- \`${comment.path}\` lines ${comment.startLine}-${comment.line}: ${bodyText(comment.body)}`,
+        `- \`${comment.path}\` lines ${comment.startLine}-${comment.line}: [View in mermaid.live](${comment.link})`,
       );
     }
     return { outcome: 'read-only', plan: planned, comments, summary };

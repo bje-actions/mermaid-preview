@@ -22,9 +22,11 @@ const SAME_REPO = {
   attribution: true,
   allowReadOnly: false,
 } as const;
+// The shipped defaults: image comments. The fork fallback is the path that
+// must carry a usable link whatever the type.
 const FORK = {
   theme: 'dark',
-  type: 'link',
+  type: 'image',
   attribution: true,
   allowReadOnly: true,
 } as const;
@@ -110,8 +112,8 @@ describe('run', () => {
     expect(result.outcome).toBe('read-only');
     expect(result.comments).toBe(0);
     const link = `[View in mermaid.live](https://mermaid.live/edit#pako:${PAKO['graph TD|dark']})`;
-    // Updates and creates both listed, each named by path and range; the hidden
-    // comment lines and the footer are stripped, so one line per block.
+    // One text link per block whatever the type: a job summary has no picture
+    // to click, and the hidden lines and footer do not belong there.
     expect(result.summary).toEqual([
       `- \`e.md\` lines 1-3: ${link}`,
       `- \`a.md\` lines 1-3: ${link}`,

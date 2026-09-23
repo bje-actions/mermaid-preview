@@ -79,18 +79,13 @@ function changedLines(run: LineRange, block: LineRange, diff: DiffLines): number
   return changed;
 }
 
-export interface Anchor extends LineRange {
-  /** False when the whole block is in the diff; true when only part of it is. */
-  partial: boolean;
-}
-
 /**
  * The line range a review comment on `range` may take. The whole range when
  * every line of it is in a hunk; otherwise the contiguous in-hunk run inside
- * the range holding the most changed lines (the earliest on a tie), marked
- * partial; null when no line of the range is in the diff at all.
+ * the range holding the most changed lines (the earliest on a tie); null when
+ * no line of the range is in the diff at all.
  */
-export function anchorRange(range: LineRange, diff: DiffLines): Anchor | null {
+export function anchorRange(range: LineRange, diff: DiffLines): LineRange | null {
   const runs: LineRange[] = [];
   let current: LineRange | null = null;
   for (let line = range.start; line <= range.end; line += 1) {
@@ -105,9 +100,7 @@ export function anchorRange(range: LineRange, diff: DiffLines): Anchor | null {
   if (current !== null) runs.push(current);
   if (runs.length === 0) return null;
   let best = runs[0] as LineRange;
-  if (runs.length === 1 && best.start === range.start && best.end === range.end) {
-    return { ...best, partial: false };
-  }
+  if (runs.length === 1) return best;
   // Runs are in line order, so a strict comparison keeps the earliest on a tie.
   let bestScore = changedLines(best, range, diff);
   for (const run of runs.slice(1)) {
@@ -117,5 +110,5 @@ export function anchorRange(range: LineRange, diff: DiffLines): Anchor | null {
       bestScore = score;
     }
   }
-  return { ...best, partial: true };
+  return best;
 }

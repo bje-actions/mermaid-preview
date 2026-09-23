@@ -45,7 +45,7 @@ requests can run the action on `pull_request_target`; the action never checks ou
 pull request content, so that trigger is safe here. `pr-number` is only needed on a trigger
 without a pull request payload.
 
-## No dependency on a rendering service
+## The action calls no rendering service
 
 The link is computed locally: deflate the mermaid.live state object at level 9, base64url,
 no padding, the `pako:` scheme mermaid.live's editor uses. Nothing is fetched from mermaid.ink
@@ -53,12 +53,28 @@ or anywhere else, and the action has no network call except to the GitHub API. W
 `type: image` the comment embeds `https://mermaid.ink/img/pako:<state>`, the same encoded
 state, and the viewer's browser fetches the render; the action still does not.
 
+The reader's browser does depend on mermaid.ink: if it is down or refuses a very large state,
+the default comment shows a broken image whose alt text still says it opens mermaid.live.
+
 A single image cannot follow the reader's light or dark mode, so the image is a `<picture>`
 with a `prefers-color-scheme: dark` source rendered on Mermaid's `dark` theme and an `<img>`
 rendered on the `theme` input. Each carries GitHub's own page background for that appearance
 (`ffffff` and `0d1117`) as mermaid.ink's `bgColor`, so the render sits flush on the comment;
 these are not inputs, because the values are GitHub's, not the consumer's. GitHub keeps this
-markup in comments (probed on PR #10) and serves both renders through its image proxy.
+markup in comments and serves both renders through its image proxy. The probe: a comment
+posted with the markup, read back with the HTML media type, kept `<picture>` and the
+`<source media>` inside a `themed-picture` element.
+
+## One visible link, and a hidden view URL
+
+The comment shows one link, to mermaid.live's edit route: the image itself for `type: image`,
+a text link worded "View in mermaid.live" for `type: link`. The edit route is the useful one
+(the reader can tweak the diagram), and a link labelled "edit" reads as if the pull request
+were editable from there. The view route still goes into every
+body as `<!-- mermaid-preview-view: <url> -->`, beside the identity marker, for tooling that
+reads the raw body. GitHub keeps HTML comments in the raw body but strips them from the
+rendered HTML and the page DOM (verified on PR #10), so such tooling reads the body through
+the REST API or the comment's edit form, not the page.
 
 ## Follow-ups not yet built
 
@@ -71,14 +87,3 @@ markup in comments (probed on PR #10) and serves both renders through its image 
 GitHub's comment sanitizer strips `target` and `rel` from every link, HTML or Markdown
 (verified with a probe comment on PR #10), so a comment cannot make its links open in a new
 tab. Whether they do is the reader's browser setting, not something this action can set.
-
-## One visible link, and a hidden view URL
-
-The comment shows one link, to mermaid.live's edit route: the image itself for `type: image`,
-a text link worded "View in mermaid.live" for `type: link`. The edit route is the useful one
-(the reader can tweak the diagram), and a link labelled "edit" reads as if the pull request
-were editable from there. The view route still goes into every
-body as `<!-- mermaid-preview-view: <url> -->`, beside the identity marker, for tooling that
-reads the raw body. GitHub keeps HTML comments in the raw body but strips them from the
-rendered HTML and the page DOM (verified on PR #10), so such tooling reads the body through
-the REST API or the comment's edit form, not the page.

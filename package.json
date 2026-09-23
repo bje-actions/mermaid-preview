@@ -2,7 +2,7 @@
   "name": "mermaid-preview",
   "version": "0.0.0",
   "private": true,
-  "description": "GitHub Action that comments a mermaid.live preview link on every changed mermaid block in a pull request's Markdown",
+  "description": "GitHub Action that comments a rendered preview of each changed mermaid block in pull request Markdown, linked to mermaid.live",
   "license": "MIT",
   "packageManager": "pnpm@10.34.5",
   "engines": {

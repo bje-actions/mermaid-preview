@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChangedFile, ExistingComment } from '../src/plan';
-import { plan } from '../src/plan';
+import { isCommentType, plan } from '../src/plan';
 import { body, decode, FOOTER, PAKO } from './helpers';
 
 const DOC = ['# T', '```mermaid', 'graph TD', '  a --> b', '```', 'tail'].join('\n');
@@ -20,6 +20,7 @@ const IMAGE = { theme: 'default', type: 'image', attribution: true } as const;
 const PAKO_LIGHT = PAKO['graph TD\n  a --> b|default'];
 const PAKO_DARK = PAKO['graph TD\n  a --> b|dark'];
 const BODY = body(KEY, PAKO_LIGHT, { type: 'link' });
+const EDIT = `https://mermaid.live/edit#pako:${PAKO_LIGHT}`;
 
 function file(over: Partial<ChangedFile> = {}): ChangedFile {
   return { path: 'docs/a.md', status: 'added', changes: 6, patch: ADDED, content: DOC, ...over };
@@ -29,10 +30,17 @@ function existing(over: Partial<ExistingComment> = {}): ExistingComment {
   return { id: 7, path: 'docs/a.md', body: BODY, line: 5, startLine: 2, ...over };
 }
 
+describe('isCommentType', () => {
+  it('accepts exactly the two documented values', () => {
+    expect(['image', 'link'].every(isCommentType)).toBe(true);
+    expect(['Image', 'img', ''].some(isCommentType)).toBe(false);
+  });
+});
+
 describe('plan', () => {
   it('creates a full-range comment for a changed block with no existing comment', () => {
     expect(plan([file()], [], LINK)).toEqual({
-      create: [{ key: KEY, path: 'docs/a.md', startLine: 2, line: 5, body: BODY }],
+      create: [{ key: KEY, path: 'docs/a.md', startLine: 2, line: 5, body: BODY, link: EDIT }],
       update: [],
       remove: [],
       skipped: [],
@@ -55,14 +63,30 @@ describe('plan', () => {
         startLine: 2,
         line: 5,
         body: body(KEY, PAKO_LIGHT, { type: 'image', pakoDark: PAKO_DARK }),
+        link: EDIT,
       },
     ]);
   });
 
-  it('encodes the theme into the link', () => {
-    const [created] = plan([file()], [], { ...LINK, theme: 'forest' }).create;
-    const encoded = /view#pako:([A-Za-z0-9_-]+) -->/.exec(created?.body ?? '')?.[1] ?? '';
-    expect(JSON.parse(decode(encoded).mermaid)).toEqual({ theme: 'forest' });
+  it('encodes the theme into the link and the light render; the dark render is always dark', () => {
+    const theme = (fragment: string | undefined) => JSON.parse(decode(fragment ?? '').mermaid);
+    const link = plan([file()], [], { ...LINK, theme: 'forest' }).create[0]?.body ?? '';
+    expect(
+      theme(
+        /\[View in mermaid.live\]\(https:\/\/mermaid.live\/edit#pako:([\w-]+)\)/.exec(link)?.[1],
+      ),
+    ).toEqual({
+      theme: 'forest',
+    });
+    const image = plan([file()], [], { ...IMAGE, theme: 'forest' }).create[0]?.body ?? '';
+    expect(
+      theme(/<img [^>]*src="https:\/\/mermaid.ink\/img\/pako:([\w-]+)\?/.exec(image)?.[1]),
+    ).toEqual({
+      theme: 'forest',
+    });
+    expect(theme(/srcset="https:\/\/mermaid.ink\/img\/pako:([\w-]+)\?/.exec(image)?.[1])).toEqual({
+      theme: 'dark',
+    });
   });
 
   it('keys each block by its ordinal in the file, not among the changed blocks', () => {
@@ -76,6 +100,7 @@ describe('plan', () => {
         startLine: 7,
         line: 9,
         body: body('docs/a.md#1', PAKO['pie|default'], { type: 'link' }),
+        link: `https://mermaid.live/edit#pako:${PAKO['pie|default']}`,
       },
     ]);
   });
@@ -134,7 +159,7 @@ describe('plan', () => {
     const stale = existing({ body: body(KEY, 'stale', { type: 'link' }) });
     const result = plan([file()], [stale], LINK);
     expect(result.update).toEqual([
-      { id: 7, key: KEY, path: 'docs/a.md', startLine: 2, line: 5, body: BODY },
+      { id: 7, key: KEY, path: 'docs/a.md', startLine: 2, line: 5, body: BODY, link: EDIT },
     ]);
     expect(result.create).toEqual([]);
     expect(result.remove).toEqual([]);

@@ -1,5 +1,5 @@
 name: 'Mermaid preview'
-description: "Comments a mermaid.live preview link on each changed mermaid block in pull request Markdown."
+description: "Comments a rendered preview of each changed mermaid block in pull request Markdown, linked to mermaid.live."
 author: 'brianespinosa'
 branding:
   icon: 'eye'
@@ -13,11 +13,11 @@ inputs:
     description: 'Pull request number. Defaults to the pull request that triggered the run.'
     required: false
   theme:
-    description: 'Mermaid theme name encoded into the preview link (default, dark, forest, neutral, or a custom name).'
+    description: 'Mermaid theme for the link and the light-mode image (default, dark, forest, neutral, or a custom name). Dark-mode readers always get the dark theme.'
     required: false
     default: 'default'
   type:
-    description: 'What the comment shows. image: the rendered diagram from mermaid.ink, theme-aware (dark mode readers get the dark theme), linking to mermaid.live. link: a text link only.'
+    description: 'What the comment shows. image: the rendered diagram from mermaid.ink, linking to mermaid.live. link: a "View in mermaid.live" text link only.'
     required: false
     default: 'image'
   attribution:
