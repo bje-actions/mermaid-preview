@@ -16,8 +16,13 @@ function reporter(): Reporter & { lines: string[] } {
   return { lines, info: (m) => lines.push(`info ${m}`), warning: (m) => lines.push(`warn ${m}`) };
 }
 
-const SAME_REPO = { theme: 'default', type: 'link', allowReadOnly: false } as const;
-const FORK = { theme: 'dark', type: 'link', allowReadOnly: true } as const;
+const SAME_REPO = {
+  theme: 'default',
+  type: 'link',
+  attribution: true,
+  allowReadOnly: false,
+} as const;
+const FORK = { theme: 'dark', type: 'link', attribution: true, allowReadOnly: true } as const;
 const denied = () =>
   Object.assign(new Error('Resource not accessible by integration'), { status: 403 });
 

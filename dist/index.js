@@ -37697,7 +37697,7 @@ function keyOf(body) {
     const match = /^<!-- mermaid-preview: (.+?) -->/m.exec(body);
     return match === null ? null : match[1];
 }
-function buildBody(key, code, options, partial) {
+function buildBody(key, code, options) {
     const links = previewLinks(code, options.theme);
     const lines = [
         marker(key),
@@ -37705,10 +37705,8 @@ function buildBody(key, code, options, partial) {
             ? `[![Mermaid diagram](${links.image})](${links.edit})`
             : `Preview this diagram on mermaid.live: [view](${links.view}) or [edit](${links.edit}).`,
     ];
-    if (partial) {
-        lines.push('', '_Only part of this block is in the diff, so the comment spans that part._');
-    }
-    lines.push('', FOOTER);
+    if (options.attribution)
+        lines.push('', FOOTER);
     return lines.join('\n');
 }
 /** The body without its marker and footer: what a job summary line shows. */
@@ -37755,7 +37753,7 @@ function plan(files, existing, options) {
                 path: file.path,
                 startLine: anchor.start,
                 line: anchor.end,
-                body: buildBody(key, block.code, options, anchor.partial),
+                body: buildBody(key, block.code, options),
             });
         }
     }
@@ -37876,6 +37874,7 @@ async function main() {
     const result = await run(client, {
         theme: getInput('theme') || 'default',
         type: type,
+        attribution: getBooleanInput('attribution'),
         allowReadOnly: headRepo !== undefined && headRepo !== `${ref.owner}/${ref.repo}`,
     }, core_namespaceObject);
     if (result.summary.length > 0) {

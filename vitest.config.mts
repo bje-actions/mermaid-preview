@@ -8,7 +8,8 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'cobertura'],
       reportsDirectory: 'coverage',
-      include: ['src/**'],
+      // .ts only: src/CLAUDE.md sits beside the modules and is not source.
+      include: ['src/**/*.ts'],
       // main.ts and github.ts are the I/O adapter: the entry point that reads
       // inputs, and the Octokit calls. Everything they call is measured here
       // against a fake client; the adapter itself is exercised by the smoke

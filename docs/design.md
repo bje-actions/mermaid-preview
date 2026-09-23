@@ -21,7 +21,8 @@ does not count.
 possible only when every block line is in a hunk. That is always true for a new block and
 usually true for an edited one. For a long block with one small edit, the hunk shows three
 lines of context around the edit and the fences are outside it, so the comment spans the
-in-hunk run holding the most changed lines (the earliest on a tie) and says it is partial.
+in-hunk run holding the most changed lines (the earliest on a tie). The body does not say the
+span is partial: the highlighted range shows it.
 
 ## Updating on a push
 
@@ -57,3 +58,9 @@ state, and the viewer's browser fetches the render; the action still does not.
 - A moved or re-indented block reads as changed and gets a comment with a link identical to
   the base's. Comparing the encoded state against the base file's block would skip it.
 - Path filtering beyond the Markdown extensions (an `include` glob input).
+
+## Links open where GitHub decides
+
+GitHub's comment sanitizer strips `target` and `rel` from every link, HTML or Markdown
+(verified with a probe comment on PR #10), so a comment cannot make its links open in a new
+tab. Whether they do is the reader's browser setting, not something this action can set.

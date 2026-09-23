@@ -15,7 +15,7 @@ const ADDED = [
   '+tail',
 ].join('\n');
 const KEY = 'docs/a.md#0';
-const LINK = { theme: 'default', type: 'link' } as const;
+const LINK = { theme: 'default', type: 'link', attribution: true } as const;
 const BODY = body(KEY, PAKO['graph TD\n  a --> b|default']);
 
 function file(over: Partial<ChangedFile> = {}): ChangedFile {
@@ -36,25 +36,28 @@ describe('plan', () => {
     });
   });
 
-  it('ends every body with the attribution footer', () => {
+  it('ends every body with the attribution footer unless attribution is off', () => {
     const [created] = plan([file()], [], LINK).create;
     expect(created?.body.endsWith(`\n\n${FOOTER}`)).toBe(true);
+    expect(plan([file()], [], { ...LINK, attribution: false }).create[0]?.body).toBe(
+      body(KEY, PAKO['graph TD\n  a --> b|default'], 'link', false),
+    );
   });
 
   it('comments with the rendered image linked to the editor when type is image', () => {
-    expect(plan([file()], [], { theme: 'default', type: 'image' }).create).toEqual([
+    expect(plan([file()], [], { ...LINK, type: 'image' }).create).toEqual([
       {
         key: KEY,
         path: 'docs/a.md',
         startLine: 2,
         line: 5,
-        body: body(KEY, PAKO['graph TD\n  a --> b|default'], false, 'image'),
+        body: body(KEY, PAKO['graph TD\n  a --> b|default'], 'image'),
       },
     ]);
   });
 
   it('encodes the theme into the link', () => {
-    const [created] = plan([file()], [], { theme: 'forest', type: 'link' }).create;
+    const [created] = plan([file()], [], { ...LINK, theme: 'forest' }).create;
     const encoded = /view#pako:([A-Za-z0-9_-]+)\)/.exec(created?.body ?? '')?.[1] ?? '';
     expect(JSON.parse(decode(encoded).mermaid)).toEqual({ theme: 'forest' });
   });
@@ -171,13 +174,13 @@ describe('plan', () => {
     expect(result.update).toEqual([]);
   });
 
-  it('anchors partially when the block is longer than the hunk, and says so', () => {
+  it('anchors partially when the block is longer than the hunk, with the same body', () => {
     const long = ['```mermaid', ...Array.from({ length: 12 }, (_, i) => `n${i}`), '```'].join('\n');
     // Only head line 7 changed; the hunk shows 4-10 with three lines of context.
     const patch = ['@@ -4,6 +4,7 @@', ' n2', ' n3', ' n4', '+n5', ' n6', ' n7', ' n8'].join('\n');
     const [created] = plan([file({ path: 'x.md', content: long, patch })], [], LINK).create;
     expect(created).toMatchObject({ key: 'x.md#0', startLine: 4, line: 10 });
     const pako = /view#pako:([A-Za-z0-9_-]+)/.exec(created?.body ?? '')?.[1] ?? '';
-    expect(created?.body).toBe(body('x.md#0', pako, true));
+    expect(created?.body).toBe(body('x.md#0', pako));
   });
 });
