@@ -7,7 +7,7 @@ itself (the smoke job in ci.yml). Change the diagram to see a new link.
 flowchart LR
   md[Changed .md file] --> blocks[mermaid blocks]
   blocks --> diff{in the diff?}
-  diff -- yes --> link[mermaid.live link as a review comment]
+  diff -- yes --> link[mermaid.live link, or the rendered image, as a review comment]
   diff -- no --> skip[no comment]
 ```
 
