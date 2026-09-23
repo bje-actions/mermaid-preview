@@ -37585,20 +37585,31 @@ function anchorRange(range, diff) {
         runs.push(current);
     if (runs.length === 0)
         return null;
-    const whole = runs[0];
-    if (runs.length === 1 && whole.start === range.start && whole.end === range.end) {
-        return { ...whole, partial: false };
+    let best = runs[0];
+    if (runs.length === 1 && best.start === range.start && best.end === range.end) {
+        return { ...best, partial: false };
     }
-    const best = runs
-        .map((run) => ({ run, score: changedLines(run, range, diff) }))
-        .sort((a, b) => b.score - a.score || a.run.start - b.run.start)[0];
-    return { ...best.run, partial: true };
+    // Runs are in line order, so a strict comparison keeps the earliest on a tie.
+    let bestScore = changedLines(best, range, diff);
+    for (const run of runs.slice(1)) {
+        const score = changedLines(run, range, diff);
+        if (score > bestScore) {
+            best = run;
+            bestScore = score;
+        }
+    }
+    return { ...best, partial: true };
 }
 
 // EXTERNAL MODULE: external "node:zlib"
 var external_node_zlib_ = __nccwpck_require__(8522);
 ;// CONCATENATED MODULE: ./build/encode.js
 
+// The state object mermaid.live's own editor puts in the URL: the diagram
+// source and the Mermaid config, the config as a JSON *string* inside the
+// JSON, which is what mermaid.live's decoder expects. Editor view state
+// (grid, pan, zoom) is left out. Compressed with deflate at level 9 and
+// base64url-encoded without padding, the `pako:` scheme.
 function encodeState(diagram, theme) {
     const state = { code: diagram, mermaid: JSON.stringify({ theme }) };
     const compressed = (0,external_node_zlib_.deflateSync)(Buffer.from(JSON.stringify(state), 'utf8'), { level: 9 });
@@ -37621,6 +37632,7 @@ function previewLinks(diagram, theme) {
 // inside an open block, a fence of the other character, or a shorter fence
 // of the same character, is content, not a block.
 const OPEN = /^ {0,3}(`{3,}|~{3,})[ \t]*([^`\s]*)/;
+const CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 function findMermaidBlocks(markdown) {
     const lines = markdown.split(/\r?\n/);
     const blocks = [];
@@ -37655,7 +37667,7 @@ function findMermaidBlocks(markdown) {
     return blocks;
 }
 function closes(line, fence) {
-    const match = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+    const match = CLOSE.exec(line);
     if (match === null)
         return false;
     const candidate = match[1];
@@ -37861,7 +37873,7 @@ main().catch((error) => {
     setOutput('comments', '0');
     if (error instanceof Error && error.stack !== undefined)
         debug(error.stack);
-    setFailed(error instanceof Error ? error.message : String(error));
+    setFailed(messageOf(error));
 });
 
 })();

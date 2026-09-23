@@ -104,12 +104,18 @@ export function anchorRange(range: LineRange, diff: DiffLines): Anchor | null {
   }
   if (current !== null) runs.push(current);
   if (runs.length === 0) return null;
-  const whole = runs[0] as LineRange;
-  if (runs.length === 1 && whole.start === range.start && whole.end === range.end) {
-    return { ...whole, partial: false };
+  let best = runs[0] as LineRange;
+  if (runs.length === 1 && best.start === range.start && best.end === range.end) {
+    return { ...best, partial: false };
   }
-  const best = runs
-    .map((run) => ({ run, score: changedLines(run, range, diff) }))
-    .sort((a, b) => b.score - a.score || a.run.start - b.run.start)[0] as { run: LineRange };
-  return { ...best.run, partial: true };
+  // Runs are in line order, so a strict comparison keeps the earliest on a tie.
+  let bestScore = changedLines(best, range, diff);
+  for (const run of runs.slice(1)) {
+    const score = changedLines(run, range, diff);
+    if (score > bestScore) {
+      best = run;
+      bestScore = score;
+    }
+  }
+  return { ...best, partial: true };
 }

@@ -18,6 +18,7 @@ export interface MermaidBlock {
 }
 
 const OPEN = /^ {0,3}(`{3,}|~{3,})[ \t]*([^`\s]*)/;
+const CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 
 export function findMermaidBlocks(markdown: string): MermaidBlock[] {
   const lines = markdown.split(/\r?\n/);
@@ -55,7 +56,7 @@ export function findMermaidBlocks(markdown: string): MermaidBlock[] {
 }
 
 function closes(line: string, fence: string): boolean {
-  const match = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+  const match = CLOSE.exec(line);
   if (match === null) return false;
   const candidate = match[1] as string;
   return candidate[0] === fence[0] && candidate.length >= fence.length;

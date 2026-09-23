@@ -1,6 +1,6 @@
 import * as core from '@actions/core';
 import { context } from '@actions/github';
-import { createClient, headShaOf } from './github';
+import { createClient, headShaOf, messageOf } from './github';
 import { run } from './run';
 
 async function main(): Promise<void> {
@@ -37,5 +37,5 @@ main().catch((error: unknown) => {
   core.setOutput('outcome', 'failed');
   core.setOutput('comments', '0');
   if (error instanceof Error && error.stack !== undefined) core.debug(error.stack);
-  core.setFailed(error instanceof Error ? error.message : String(error));
+  core.setFailed(messageOf(error));
 });

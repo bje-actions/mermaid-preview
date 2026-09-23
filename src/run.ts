@@ -1,5 +1,4 @@
-import type { PullRequestClient } from './github';
-import { isPermissionDenied, messageOf, statusOf } from './github';
+import { isPermissionDenied, messageOf, type PullRequestClient, statusOf } from './github';
 import { type ChangedFile, type DesiredComment, isMarkdown, type Plan, plan } from './plan';
 
 /** What `run` reports; `failed` is the action's third output value, set by `main.ts`. */
