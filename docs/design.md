@@ -48,11 +48,12 @@ without a pull request payload.
 
 The link is computed locally: deflate the mermaid.live state object at level 9, base64url,
 no padding, the `pako:` scheme mermaid.live's editor uses. Nothing is fetched from mermaid.ink
-or anywhere else, and the action has no network call except to the GitHub API.
+or anywhere else, and the action has no network call except to the GitHub API. With
+`type: image` the comment embeds `https://mermaid.ink/img/pako:<state>`, the same encoded
+state, and the viewer's browser fetches the render; the action still does not.
 
 ## Follow-ups not yet built
 
 - A moved or re-indented block reads as changed and gets a comment with a link identical to
   the base's. Comparing the encoded state against the base file's block would skip it.
 - Path filtering beyond the Markdown extensions (an `include` glob input).
-- `mermaid.ink` image links as an alternative to mermaid.live.

@@ -1,5 +1,13 @@
 import { isPermissionDenied, messageOf, type PullRequestClient, statusOf } from './github';
-import { type ChangedFile, type DesiredComment, isMarkdown, type Plan, plan } from './plan';
+import {
+  type BodyOptions,
+  bodyText,
+  type ChangedFile,
+  type DesiredComment,
+  isMarkdown,
+  type Plan,
+  plan,
+} from './plan';
 
 /** What `run` reports; `failed` is the action's third output value, set by `main.ts`. */
 export type Outcome = 'completed' | 'read-only';
@@ -18,8 +26,7 @@ export interface Reporter {
   warning(message: string): void;
 }
 
-export interface RunOptions {
-  theme: string;
+export interface RunOptions extends BodyOptions {
   /**
    * True on a pull request from a fork, whose default token cannot write
    * review comments: a permission failure then falls back to the job
@@ -42,7 +49,7 @@ export async function run(
     }
   }
   const existing = await client.listReviewComments();
-  const planned = plan(files, existing, options.theme);
+  const planned = plan(files, existing, options);
   const summary: string[] = [];
   for (const skip of planned.skipped) {
     report.warning(`${skip.path}: skipped, ${skip.reason}`);
@@ -81,7 +88,7 @@ export async function run(
     );
     for (const comment of [...planned.update, ...planned.create]) {
       summary.push(
-        `- \`${comment.path}\` lines ${comment.startLine}-${comment.line}: ${comment.body.replace(/^<!--.*-->\n/, '')}`,
+        `- \`${comment.path}\` lines ${comment.startLine}-${comment.line}: ${bodyText(comment.body)}`,
       );
     }
     return { outcome: 'read-only', plan: planned, comments, summary };

@@ -16,6 +16,10 @@ inputs:
     description: 'Mermaid theme name encoded into the preview link (default, dark, forest, neutral, or a custom name).'
     required: false
     default: 'default'
+  type:
+    description: 'What the comment shows. link: a sentence with view and edit links. image: the rendered diagram from mermaid.ink, linking to the mermaid.live editor.'
+    required: false
+    default: 'link'
 outputs:
   outcome:
     description: 'completed when every comment was synced, read-only when the token could not write review comments (fork pull request) and the links went to the job summary instead, failed otherwise.'

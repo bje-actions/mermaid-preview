@@ -1,6 +1,7 @@
 import * as core from '@actions/core';
 import { context } from '@actions/github';
 import { createClient, headShaOf, messageOf } from './github';
+import { COMMENT_TYPES, type CommentType } from './plan';
 import { run } from './run';
 
 async function main(): Promise<void> {
@@ -17,11 +18,16 @@ async function main(): Promise<void> {
   const ref = { owner: context.repo.owner, repo: context.repo.repo, number };
   const headSha: string = event?.number === number ? event.head.sha : await headShaOf(token, ref);
   const headRepo: string | undefined = event?.head?.repo?.full_name;
+  const type = core.getInput('type') || 'link';
+  if (!(COMMENT_TYPES as readonly string[]).includes(type)) {
+    throw new Error(`type must be one of ${COMMENT_TYPES.join(', ')}, got '${type}'`);
+  }
   const client = createClient(token, { ...ref, headSha });
   const result = await run(
     client,
     {
       theme: core.getInput('theme') || 'default',
+      type: type as CommentType,
       allowReadOnly: headRepo !== undefined && headRepo !== `${ref.owner}/${ref.repo}`,
     },
     core,

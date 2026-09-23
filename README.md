@@ -37,6 +37,7 @@ No checkout is needed: the action reads the changed files through the API. The d
 | `token`     | `${{ github.token }}` | Token for the pull request API calls. Needs `pull-requests: write`.          |
 | `pr-number` | the triggering PR     | Pull request number, for runs not triggered by `pull_request`.               |
 | `theme`     | `default`             | Mermaid theme encoded into the link (`default`, `dark`, `forest`, `neutral`). |
+| `type`      | `link`                | `link`: a sentence with view and edit links. `image`: the rendered diagram, linking to the editor. |
 
 ### Outputs
 
@@ -56,7 +57,8 @@ No checkout is needed: the action reads the changed files through the API. The d
   the block moved (the API cannot move a comment's range). A block that is removed, or reverted
   to its base content, loses its comment.
 - Comments are identified by an HTML marker carrying the file path and the block's ordinal in
-  that file, so the action never touches a human's comment.
+  that file, so the action never touches a human's comment. Each ends with a small attribution
+  line linking to this listing.
 - On a fork pull request the default token is read-only; the links are written to the job
   summary and the run stays green with `outcome: read-only`. On a same-repository pull request a
   write failure fails the run, so a job that forgot `pull-requests: write` is not silently green.

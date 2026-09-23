@@ -20,6 +20,7 @@ describe('previewLinks', () => {
     expect(previewLinks('graph TD', 'default')).toEqual({
       view: `https://mermaid.live/view#pako:${PAKO['graph TD|default']}`,
       edit: `https://mermaid.live/edit#pako:${PAKO['graph TD|default']}`,
+      image: `https://mermaid.ink/img/pako:${PAKO['graph TD|default']}`,
     });
   });
 });

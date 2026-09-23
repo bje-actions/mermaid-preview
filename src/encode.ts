@@ -3,6 +3,8 @@ import { deflateSync } from 'node:zlib';
 export interface PreviewLinks {
   view: string;
   edit: string;
+  /** The rendered diagram from mermaid.ink, which reads the same encoded state. */
+  image: string;
 }
 
 // The state object mermaid.live's own editor puts in the URL: the diagram
@@ -21,5 +23,6 @@ export function previewLinks(diagram: string, theme: string): PreviewLinks {
   return {
     view: `https://mermaid.live/view#pako:${encoded}`,
     edit: `https://mermaid.live/edit#pako:${encoded}`,
+    image: `https://mermaid.ink/img/pako:${encoded}`,
   };
 }

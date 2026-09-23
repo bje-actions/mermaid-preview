@@ -16,8 +16,8 @@ function reporter(): Reporter & { lines: string[] } {
   return { lines, info: (m) => lines.push(`info ${m}`), warning: (m) => lines.push(`warn ${m}`) };
 }
 
-const SAME_REPO = { theme: 'default', allowReadOnly: false };
-const FORK = { theme: 'dark', allowReadOnly: true };
+const SAME_REPO = { theme: 'default', type: 'link', allowReadOnly: false } as const;
+const FORK = { theme: 'dark', type: 'link', allowReadOnly: true } as const;
 const denied = () =>
   Object.assign(new Error('Resource not accessible by integration'), { status: 403 });
 
@@ -88,6 +88,7 @@ describe('run', () => {
     const links = (pako: string) =>
       `[view](https://mermaid.live/view#pako:${pako}) or [edit](https://mermaid.live/edit#pako:${pako})`;
     // Updates and creates both listed, each named by path and range, marker stripped.
+    // Marker and footer stripped: the summary is one line per block.
     expect(result.summary).toEqual([
       `- \`e.md\` lines 1-3: Preview this diagram on mermaid.live: ${links(PAKO['graph TD|dark'])}.`,
       `- \`a.md\` lines 1-3: Preview this diagram on mermaid.live: ${links(PAKO['graph TD|dark'])}.`,
