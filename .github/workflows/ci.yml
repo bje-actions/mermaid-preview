@@ -95,6 +95,7 @@ jobs:
         uses: ./
         with:
           type: image
+          background: '#ffffff'
 
       - name: The smoke test must have completed
         env:

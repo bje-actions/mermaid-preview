@@ -37699,10 +37699,12 @@ function keyOf(body) {
 }
 function buildBody(key, code, options) {
     const links = previewLinks(code, options.theme);
+    const background = options.background.replace(/^#/, '');
+    const image = background === '' ? links.image : `${links.image}?bgColor=${encodeURIComponent(background)}`;
     const lines = [
         marker(key),
         options.type === 'image'
-            ? `[![Mermaid diagram](${links.image})](${links.edit})`
+            ? `[![Mermaid diagram](${image})](${links.edit})`
             : `Preview this diagram on mermaid.live: [view](${links.view}) or [edit](${links.edit}).`,
     ];
     if (options.attribution)
@@ -37875,6 +37877,7 @@ async function main() {
         theme: getInput('theme') || 'default',
         type: type,
         attribution: getBooleanInput('attribution'),
+        background: getInput('background'),
         allowReadOnly: headRepo !== undefined && headRepo !== `${ref.owner}/${ref.repo}`,
     }, core_namespaceObject);
     if (result.summary.length > 0) {

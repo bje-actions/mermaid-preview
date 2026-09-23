@@ -15,7 +15,7 @@ const ADDED = [
   '+tail',
 ].join('\n');
 const KEY = 'docs/a.md#0';
-const LINK = { theme: 'default', type: 'link', attribution: true } as const;
+const LINK = { theme: 'default', type: 'link', attribution: true, background: '' } as const;
 const BODY = body(KEY, PAKO['graph TD\n  a --> b|default']);
 
 function file(over: Partial<ChangedFile> = {}): ChangedFile {
@@ -54,6 +54,16 @@ describe('plan', () => {
         body: body(KEY, PAKO['graph TD\n  a --> b|default'], 'image'),
       },
     ]);
+  });
+
+  it('adds the background to the image URL only, without a leading hash', () => {
+    const pako = PAKO['graph TD\n  a --> b|default'];
+    const image = { ...LINK, type: 'image', background: '#1e1e1e' } as const;
+    expect(plan([file()], [], image).create[0]?.body).toBe(
+      body(KEY, pako, 'image', true, '1e1e1e'),
+    );
+    const link = { ...LINK, background: '1e1e1e' } as const;
+    expect(plan([file()], [], link).create[0]?.body).toBe(body(KEY, pako));
   });
 
   it('encodes the theme into the link', () => {
