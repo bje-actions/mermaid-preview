@@ -36,18 +36,18 @@ export interface BodyShape {
 
 /** The comment body the action writes, spelled out rather than built by the code under test. */
 export function body(key: string, pako: string, shape: BodyShape = {}): string {
-  const { type = 'link', attribution = true, pakoDark = '' } = shape;
-  const links = `[view](https://mermaid.live/view#pako:${pako}) or [edit](https://mermaid.live/edit#pako:${pako})`;
+  const { type = 'image', attribution = true, pakoDark = '' } = shape;
+  const edit = `https://mermaid.live/edit#pako:${pako}`;
   // GitHub's own page backgrounds, so the render sits flush on either appearance.
-  const main =
-    type === 'image'
-      ? `<a href="https://mermaid.live/edit#pako:${pako}"><picture>` +
-        `<source media="(prefers-color-scheme: dark)" srcset="https://mermaid.ink/img/pako:${pakoDark}?bgColor=0d1117">` +
-        `<img alt="Mermaid diagram" src="https://mermaid.ink/img/pako:${pako}?bgColor=ffffff">` +
-        '</picture></a>'
-      : `Preview this diagram on mermaid.live: ${links}.`;
+  const picture =
+    `<a href="${edit}"><picture>` +
+    `<source media="(prefers-color-scheme: dark)" srcset="https://mermaid.ink/img/pako:${pakoDark}?bgColor=0d1117">` +
+    `<img alt="Mermaid diagram" src="https://mermaid.ink/img/pako:${pako}?bgColor=ffffff">` +
+    '</picture></a>\n';
+  const main = `${type === 'image' ? picture : ''}[View in mermaid.live](${edit})`;
   const footer = attribution ? `\n\n${FOOTER}` : '';
-  return `<!-- mermaid-preview: ${key} -->\n${main}${footer}`;
+  // The view URL rides along hidden, for tooling that reads the raw body.
+  return `<!-- mermaid-preview: ${key} -->\n<!-- mermaid-preview-view: https://mermaid.live/view#pako:${pako} -->\n${main}${footer}`;
 }
 
 export interface FakeOptions {

@@ -18,7 +18,7 @@ async function main(): Promise<void> {
   const ref = { owner: context.repo.owner, repo: context.repo.repo, number };
   const headSha: string = event?.number === number ? event.head.sha : await headShaOf(token, ref);
   const headRepo: string | undefined = event?.head?.repo?.full_name;
-  const type = core.getInput('type') || 'link';
+  const type = core.getInput('type') || 'image';
   if (!(COMMENT_TYPES as readonly string[]).includes(type)) {
     throw new Error(`type must be one of ${COMMENT_TYPES.join(', ')}, got '${type}'`);
   }

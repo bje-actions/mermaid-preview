@@ -71,3 +71,13 @@ markup in comments (probed on PR #10) and serves both renders through its image 
 GitHub's comment sanitizer strips `target` and `rel` from every link, HTML or Markdown
 (verified with a probe comment on PR #10), so a comment cannot make its links open in a new
 tab. Whether they do is the reader's browser setting, not something this action can set.
+
+## One visible link, and a hidden view URL
+
+The comment shows one link, to mermaid.live's edit route, worded "View in mermaid.live": the
+edit route is the useful one (the reader can tweak the diagram), and a link labelled "edit"
+reads as if the pull request were editable from there. The view route still goes into every
+body as `<!-- mermaid-preview-view: <url> -->`, beside the identity marker, for tooling that
+reads the raw body. GitHub keeps HTML comments in the raw body but strips them from the
+rendered HTML and the page DOM (verified on PR #10), so such tooling reads the body through
+the REST API or the comment's edit form, not the page.

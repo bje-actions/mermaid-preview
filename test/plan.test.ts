@@ -15,14 +15,11 @@ const ADDED = [
   '+tail',
 ].join('\n');
 const KEY = 'docs/a.md#0';
-const LINK = {
-  theme: 'default',
-  type: 'link',
-  attribution: true,
-} as const;
+const LINK = { theme: 'default', type: 'link', attribution: true } as const;
+const IMAGE = { theme: 'default', type: 'image', attribution: true } as const;
 const PAKO_LIGHT = PAKO['graph TD\n  a --> b|default'];
 const PAKO_DARK = PAKO['graph TD\n  a --> b|dark'];
-const BODY = body(KEY, PAKO['graph TD\n  a --> b|default']);
+const BODY = body(KEY, PAKO_LIGHT, { type: 'link' });
 
 function file(over: Partial<ChangedFile> = {}): ChangedFile {
   return { path: 'docs/a.md', status: 'added', changes: 6, patch: ADDED, content: DOC, ...over };
@@ -46,12 +43,12 @@ describe('plan', () => {
     const [created] = plan([file()], [], LINK).create;
     expect(created?.body.endsWith(`\n\n${FOOTER}`)).toBe(true);
     expect(plan([file()], [], { ...LINK, attribution: false }).create[0]?.body).toBe(
-      body(KEY, PAKO_LIGHT, { attribution: false }),
+      body(KEY, PAKO_LIGHT, { type: 'link', attribution: false }),
     );
   });
 
   it('comments with a theme-aware picture linked to the editor when type is image', () => {
-    expect(plan([file()], [], { ...LINK, type: 'image' }).create).toEqual([
+    expect(plan([file()], [], IMAGE).create).toEqual([
       {
         key: KEY,
         path: 'docs/a.md',
@@ -64,7 +61,7 @@ describe('plan', () => {
 
   it('encodes the theme into the link', () => {
     const [created] = plan([file()], [], { ...LINK, theme: 'forest' }).create;
-    const encoded = /view#pako:([A-Za-z0-9_-]+)\)/.exec(created?.body ?? '')?.[1] ?? '';
+    const encoded = /view#pako:([A-Za-z0-9_-]+) -->/.exec(created?.body ?? '')?.[1] ?? '';
     expect(JSON.parse(decode(encoded).mermaid)).toEqual({ theme: 'forest' });
   });
 
@@ -78,7 +75,7 @@ describe('plan', () => {
         path: 'docs/a.md',
         startLine: 7,
         line: 9,
-        body: body('docs/a.md#1', PAKO['pie|default']),
+        body: body('docs/a.md#1', PAKO['pie|default'], { type: 'link' }),
       },
     ]);
   });
@@ -134,7 +131,7 @@ describe('plan', () => {
   });
 
   it('updates in place when the range is unchanged and the link changed', () => {
-    const stale = existing({ body: body(KEY, 'stale') });
+    const stale = existing({ body: body(KEY, 'stale', { type: 'link' }) });
     const result = plan([file()], [stale], LINK);
     expect(result.update).toEqual([
       { id: 7, key: KEY, path: 'docs/a.md', startLine: 2, line: 5, body: BODY },
@@ -167,7 +164,12 @@ describe('plan', () => {
   });
 
   it('removes a comment for a block that is no longer changed, and duplicates; leaves human comments', () => {
-    const stale = existing({ id: 1, body: body('docs/a.md#3', 'x'), line: 9, startLine: null });
+    const stale = existing({
+      id: 1,
+      body: body('docs/a.md#3', 'x', { type: 'link' }),
+      line: 9,
+      startLine: null,
+    });
     const first = existing({ id: 2 });
     const dup = existing({ id: 3 });
     const human = existing({ id: 4, body: 'nice diagram', line: 3, startLine: null });
@@ -187,6 +189,6 @@ describe('plan', () => {
     const [created] = plan([file({ path: 'x.md', content: long, patch })], [], LINK).create;
     expect(created).toMatchObject({ key: 'x.md#0', startLine: 4, line: 10 });
     const pako = /view#pako:([A-Za-z0-9_-]+)/.exec(created?.body ?? '')?.[1] ?? '';
-    expect(created?.body).toBe(body('x.md#0', pako));
+    expect(created?.body).toBe(body('x.md#0', pako, { type: 'link' }));
   });
 });
