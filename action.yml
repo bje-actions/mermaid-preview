@@ -1,5 +1,5 @@
 name: 'Mermaid preview'
-description: 'Comments a mermaid.live preview link on every changed mermaid code block in a pull request''s Markdown files, and keeps the comment current as the block changes.'
+description: "Comments a mermaid.live preview link on each changed mermaid block in a pull request's Markdown."
 author: 'brianespinosa'
 branding:
   icon: 'git-pull-request'
