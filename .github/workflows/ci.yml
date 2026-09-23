@@ -94,7 +94,11 @@ jobs:
         id: smoke
         uses: ./
 
-      - name: The smoke test must have completed, with a comment when the fixture changed
+      # Asserts the pull request's end state, not the run's write count: a push
+      # that leaves the fixture's body unchanged writes nothing and is still
+      # correct. When the fixture is in the diff, exactly one comment with its
+      # marker must exist; otherwise none.
+      - name: The smoke test must have completed, with the fixture commented when it changed
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
@@ -102,6 +106,8 @@ jobs:
           COMMENTS: ${{ steps.smoke.outputs.comments }}
         run: |
           expected=$(gh pr diff "$PR" --name-only | grep -c '^test/fixtures/sample.md$' || true)
-          echo "outcome=${OUTCOME} comments=${COMMENTS} expected=${expected}"
+          actual=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR}/comments" --paginate \
+            --jq '[.[] | select(.body | startswith("<!-- mermaid-preview: test/fixtures/sample.md#0 -->"))] | length')
+          echo "outcome=${OUTCOME} written=${COMMENTS} fixture comments=${actual} expected=${expected}"
           test "$OUTCOME" = "completed"
-          test "$COMMENTS" = "$expected"
+          test "$actual" = "$expected"
