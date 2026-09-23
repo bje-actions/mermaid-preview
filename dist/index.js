@@ -37705,11 +37705,9 @@ function buildBody(key, code, options) {
         // (GitHub strips HTML comments from the rendered page).
         `<!-- mermaid-preview-view: ${links.view} -->`,
     ];
-    if (options.type === 'image')
-        lines.push(picture(code, links));
-    // One visible link, to the editor, worded so nobody expects to edit the
-    // pull request from there.
-    lines.push(`[View in mermaid.live](${links.edit})`);
+    // One visible link either way, to the editor. The text form is worded so
+    // nobody expects to edit the pull request from there.
+    lines.push(options.type === 'image' ? picture(code, links) : `[View in mermaid.live](${links.edit})`);
     if (options.attribution)
         lines.push('', FOOTER);
     return lines.join('\n');

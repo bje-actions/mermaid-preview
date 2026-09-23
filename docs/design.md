@@ -74,9 +74,10 @@ tab. Whether they do is the reader's browser setting, not something this action 
 
 ## One visible link, and a hidden view URL
 
-The comment shows one link, to mermaid.live's edit route, worded "View in mermaid.live": the
-edit route is the useful one (the reader can tweak the diagram), and a link labelled "edit"
-reads as if the pull request were editable from there. The view route still goes into every
+The comment shows one link, to mermaid.live's edit route: the image itself for `type: image`,
+a text link worded "View in mermaid.live" for `type: link`. The edit route is the useful one
+(the reader can tweak the diagram), and a link labelled "edit" reads as if the pull request
+were editable from there. The view route still goes into every
 body as `<!-- mermaid-preview-view: <url> -->`, beside the identity marker, for tooling that
 reads the raw body. GitHub keeps HTML comments in the raw body but strips them from the
 rendered HTML and the page DOM (verified on PR #10), so such tooling reads the body through

@@ -43,8 +43,8 @@ export function body(key: string, pako: string, shape: BodyShape = {}): string {
     `<a href="${edit}"><picture>` +
     `<source media="(prefers-color-scheme: dark)" srcset="https://mermaid.ink/img/pako:${pakoDark}?bgColor=0d1117">` +
     `<img alt="Mermaid diagram" src="https://mermaid.ink/img/pako:${pako}?bgColor=ffffff">` +
-    '</picture></a>\n';
-  const main = `${type === 'image' ? picture : ''}[View in mermaid.live](${edit})`;
+    '</picture></a>';
+  const main = type === 'image' ? picture : `[View in mermaid.live](${edit})`;
   const footer = attribution ? `\n\n${FOOTER}` : '';
   // The view URL rides along hidden, for tooling that reads the raw body.
   return `<!-- mermaid-preview: ${key} -->\n<!-- mermaid-preview-view: https://mermaid.live/view#pako:${pako} -->\n${main}${footer}`;

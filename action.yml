@@ -17,7 +17,7 @@ inputs:
     required: false
     default: 'default'
   type:
-    description: 'What the comment shows. image: the rendered diagram from mermaid.ink, theme-aware (dark mode readers get the dark theme), above a link to mermaid.live. link: the link alone.'
+    description: 'What the comment shows. image: the rendered diagram from mermaid.ink, theme-aware (dark mode readers get the dark theme), linking to mermaid.live. link: a text link only.'
     required: false
     default: 'image'
   attribution:
