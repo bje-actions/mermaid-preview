@@ -45,7 +45,7 @@ No checkout is needed: the action reads the changed files through the API. The d
 | `outcome`  | `completed`, `read-only` (the token could not write review comments and the links went to the job summary instead), or `failed`. |
 | `comments` | Number of review comments created or updated.                                                                                     |
 
-## Behaviour
+## Behavior
 
 - Only `mermaid` blocks whose lines the pull request changed get a comment. A file that
   changed elsewhere leaves its untouched diagrams alone.

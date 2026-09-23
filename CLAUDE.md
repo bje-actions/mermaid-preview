@@ -7,9 +7,9 @@ See `README.md` for what the action does and `docs/design.md` for why each rule 
 - `src/main.ts`: entry point, reads inputs, wires the adapter, sets outputs. Excluded from
   coverage with `src/github.ts` (the Octokit adapter); the smoke job in `ci.yml` exercises both.
 - `src/run.ts`: fetch, plan, apply, and the read-only fallback for fork pull requests (the one
-  behaviour rule outside the pure modules).
+  behavior rule outside the pure modules).
 - `src/plan.ts`: the pure decision: changed files and existing comments in, create, update,
-  remove and skipped out. Every other behaviour rule lives here or in the three modules below.
+  remove and skipped out. Every other behavior rule lives here or in the three modules below.
 - `src/markdown.ts` (fence finder), `src/diff.ts` (patch parsing, changed-within, anchor range),
   `src/encode.ts` (the `pako:` state encoding mermaid.live reads).
 - `dist/index.js`: the ncc bundle consumers run. Committed; the lefthook `build` step rebuilds
