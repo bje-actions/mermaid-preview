@@ -31,10 +31,11 @@ that workflow requires.
 
 ## Marketplace
 
-The listing is published per release, by hand: open the release's edit form on GitHub and tick
-"Publish this Action to the GitHub Marketplace". Releases created by the workflow do not reach
-the listing on their own; #3 tracks whether a different token would change that. Consumers on
-the `v1` alias tag get every release regardless.
+The first release was published to the listing by hand once (the release edit form, "Publish
+this Action to the GitHub Marketplace"). Every release the workflow creates since then has
+reached the listing on its own, including with the default `GITHUB_TOKEN`; a release created
+before the first listing existed (`v1.0.1`) never appears on it. Consumers on the `v1` alias tag
+get every release either way.
 
 The Marketplace validates `action.yml` at the release's commit: the description must be under
 125 characters, and `branding` takes a Feather icon name and one of nine named colors.
