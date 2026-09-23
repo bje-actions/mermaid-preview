@@ -38,6 +38,9 @@ The baseline is mattpocock's `engineering/tdd` skill (its `mocking.md` and `test
   `test`, `style` and `build` do not release.
 - Never `--no-verify`. Never lower a coverage threshold; exclusion by file name with a stated
   reason is the only relief.
+- The CI job names `Build and test` and `Smoke test on this pull request` are required checks on
+  the repo ruleset Require CI (23861154, created by hand with `gh api`, not managed elsewhere).
+  Renaming one silently blocks every pull request; see the header comment in `ci.yml`.
 - `action.yml` inputs and outputs are a published contract. Adding is a `feat`; removing or
   renaming is a breaking change.
 - No em-dashes in any written output.

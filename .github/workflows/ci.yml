@@ -12,6 +12,16 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# THE TWO JOB NAMES BELOW ARE A CONTRACT: "Build and test" and "Smoke test on
+# this pull request" are required by the repo ruleset Require CI (23861154),
+# matched by exact string. Renaming one does not fail the build: the required
+# check never reports and every pull request waits forever. Add a new required
+# name to the ruleset only after it has reported on main once; remove it from
+# the ruleset before the pull request that drops the job merges.
+#
+# The smoke job runs only on same-repository pull requests, so a fork pull
+# request never satisfies the ruleset and cannot merge without a maintainer
+# pushing its branch into this repository first. That is intended.
 jobs:
   build:
     name: Build and test
