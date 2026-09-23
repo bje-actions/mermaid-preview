@@ -22,13 +22,14 @@ permissions:
 
 jobs:
   preview:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     steps:
       - uses: bje-actions/mermaid-preview@v1
 ```
 
-No checkout is needed: the action reads the changed files through the API. The default
-`GITHUB_TOKEN` is enough for pull requests from the same repository.
+No checkout is needed: the action reads the changed files through the API, so the small
+`ubuntu-slim` runner is enough. The default `GITHUB_TOKEN` is enough for pull requests from the
+same repository.
 
 ### Inputs
 
