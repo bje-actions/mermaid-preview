@@ -19,8 +19,6 @@ const LINK = {
   theme: 'default',
   type: 'link',
   attribution: true,
-  background: '',
-  backgroundDark: '',
 } as const;
 const PAKO_LIGHT = PAKO['graph TD\n  a --> b|default'];
 const PAKO_DARK = PAKO['graph TD\n  a --> b|dark'];
@@ -62,25 +60,6 @@ describe('plan', () => {
         body: body(KEY, PAKO_LIGHT, { type: 'image', pakoDark: PAKO_DARK }),
       },
     ]);
-  });
-
-  it('adds each background to its own image render only, without a leading hash', () => {
-    const image = {
-      ...LINK,
-      type: 'image',
-      background: '#ffffff',
-      backgroundDark: '0d1117',
-    } as const;
-    expect(plan([file()], [], image).create[0]?.body).toBe(
-      body(KEY, PAKO_LIGHT, {
-        type: 'image',
-        pakoDark: PAKO_DARK,
-        background: 'ffffff',
-        backgroundDark: '0d1117',
-      }),
-    );
-    const link = { ...LINK, background: 'ffffff', backgroundDark: '0d1117' } as const;
-    expect(plan([file()], [], link).create[0]?.body).toBe(body(KEY, PAKO_LIGHT));
   });
 
   it('encodes the theme into the link', () => {

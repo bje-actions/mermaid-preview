@@ -30,29 +30,20 @@ export const FOOTER =
 export interface BodyShape {
   type?: 'link' | 'image';
   attribution?: boolean;
-  /** `bgColor` for the light and dark image renders; empty for none. */
-  background?: string;
-  backgroundDark?: string;
   /** The dark-theme encoding, for the image's dark source. */
   pakoDark?: string;
 }
 
 /** The comment body the action writes, spelled out rather than built by the code under test. */
 export function body(key: string, pako: string, shape: BodyShape = {}): string {
-  const {
-    type = 'link',
-    attribution = true,
-    background = '',
-    backgroundDark = '',
-    pakoDark = '',
-  } = shape;
+  const { type = 'link', attribution = true, pakoDark = '' } = shape;
   const links = `[view](https://mermaid.live/view#pako:${pako}) or [edit](https://mermaid.live/edit#pako:${pako})`;
-  const query = (bg: string) => (bg === '' ? '' : `?bgColor=${bg}`);
+  // GitHub's own page backgrounds, so the render sits flush on either appearance.
   const main =
     type === 'image'
       ? `<a href="https://mermaid.live/edit#pako:${pako}"><picture>` +
-        `<source media="(prefers-color-scheme: dark)" srcset="https://mermaid.ink/img/pako:${pakoDark}${query(backgroundDark)}">` +
-        `<img alt="Mermaid diagram" src="https://mermaid.ink/img/pako:${pako}${query(background)}">` +
+        `<source media="(prefers-color-scheme: dark)" srcset="https://mermaid.ink/img/pako:${pakoDark}?bgColor=0d1117">` +
+        `<img alt="Mermaid diagram" src="https://mermaid.ink/img/pako:${pako}?bgColor=ffffff">` +
         '</picture></a>'
       : `Preview this diagram on mermaid.live: ${links}.`;
   const footer = attribution ? `\n\n${FOOTER}` : '';

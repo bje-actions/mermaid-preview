@@ -55,8 +55,10 @@ state, and the viewer's browser fetches the render; the action still does not.
 
 A single image cannot follow the reader's light or dark mode, so the image is a `<picture>`
 with a `prefers-color-scheme: dark` source rendered on Mermaid's `dark` theme and an `<img>`
-rendered on the `theme` input, each with its own optional `bgColor`. GitHub keeps this markup
-in comments (probed on PR #10) and serves both renders through its image proxy.
+rendered on the `theme` input. Each carries GitHub's own page background for that appearance
+(`ffffff` and `0d1117`) as mermaid.ink's `bgColor`, so the render sits flush on the comment;
+these are not inputs, because the values are GitHub's, not the consumer's. GitHub keeps this
+markup in comments (probed on PR #10) and serves both renders through its image proxy.
 
 ## Follow-ups not yet built
 

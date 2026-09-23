@@ -29,8 +29,6 @@ async function main(): Promise<void> {
       theme: core.getInput('theme') || 'default',
       type: type as CommentType,
       attribution: core.getBooleanInput('attribution'),
-      background: core.getInput('background'),
-      backgroundDark: core.getInput('background-dark'),
       allowReadOnly: headRepo !== undefined && headRepo !== `${ref.owner}/${ref.repo}`,
     },
     core,

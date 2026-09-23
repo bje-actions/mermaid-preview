@@ -20,16 +20,12 @@ const SAME_REPO = {
   theme: 'default',
   type: 'link',
   attribution: true,
-  background: '',
-  backgroundDark: '',
   allowReadOnly: false,
 } as const;
 const FORK = {
   theme: 'dark',
   type: 'link',
   attribution: true,
-  background: '',
-  backgroundDark: '',
   allowReadOnly: true,
 } as const;
 const denied = () =>

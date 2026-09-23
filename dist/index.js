@@ -37702,7 +37702,7 @@ function buildBody(key, code, options) {
     const lines = [
         marker(key),
         options.type === 'image'
-            ? picture(code, options, links)
+            ? picture(code, links)
             : `Preview this diagram on mermaid.live: [view](${links.view}) or [edit](${links.edit}).`,
     ];
     if (options.attribution)
@@ -37713,15 +37713,14 @@ function buildBody(key, code, options) {
  * A theme-aware image linked to the editor. GitHub keeps a `<picture>` with a
  * `prefers-color-scheme: dark` source in comments (probed on PR #10), so dark
  * mode readers get a render on Mermaid's dark theme, light mode readers the
- * `theme` input's render, each with its own optional background.
+ * `theme` input's render. Each sits on GitHub's own page background for that
+ * appearance, so the render is flush with the comment rather than a box.
  */
-function picture(code, options, links) {
-    const withBackground = (url, background) => {
-        const color = background.replace(/^#/, '');
-        return color === '' ? url : `${url}?bgColor=${encodeURIComponent(color)}`;
-    };
-    const dark = withBackground(previewLinks(code, 'dark').image, options.backgroundDark);
-    const light = withBackground(links.image, options.background);
+const LIGHT_BACKGROUND = 'ffffff';
+const DARK_BACKGROUND = '0d1117';
+function picture(code, links) {
+    const dark = `${previewLinks(code, 'dark').image}?bgColor=${DARK_BACKGROUND}`;
+    const light = `${links.image}?bgColor=${LIGHT_BACKGROUND}`;
     return (`<a href="${links.edit}"><picture>` +
         `<source media="(prefers-color-scheme: dark)" srcset="${dark}">` +
         `<img alt="Mermaid diagram" src="${light}">` +
@@ -37893,8 +37892,6 @@ async function main() {
         theme: getInput('theme') || 'default',
         type: type,
         attribution: getBooleanInput('attribution'),
-        background: getInput('background'),
-        backgroundDark: getInput('background-dark'),
         allowReadOnly: headRepo !== undefined && headRepo !== `${ref.owner}/${ref.repo}`,
     }, core_namespaceObject);
     if (result.summary.length > 0) {
