@@ -90,8 +90,13 @@ export function keyOf(body: string): string | null {
   return match === null ? null : (match[1] as string);
 }
 
-export function buildBody(key: string, code: string, options: BodyOptions): string {
-  const links = previewLinks(code, options.theme);
+/** `links` are `code`'s on the `theme` input, which `plan` also keeps as the comment's `link`. */
+export function buildBody(
+  key: string,
+  code: string,
+  links: PreviewLinks,
+  options: BodyOptions,
+): string {
   const lines = [
     marker(key),
     // The view URL rides along hidden, for tooling that reads the raw body
@@ -165,13 +170,14 @@ export function plan(
       if (anchor === null)
         throw new Error(`no anchor for a changed block at ${file.path}:${range.start}`);
       const key = commentKey(file.path, block.ordinal);
+      const links = previewLinks(block.code, options.theme);
       desired.set(key, {
         key,
         path: file.path,
         startLine: anchor.start,
         line: anchor.end,
-        body: buildBody(key, block.code, options),
-        link: previewLinks(block.code, options.theme).edit,
+        body: buildBody(key, block.code, links, options),
+        link: links.edit,
       });
     }
   }

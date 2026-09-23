@@ -100,7 +100,6 @@ export function anchorRange(range: LineRange, diff: DiffLines): LineRange | null
   if (current !== null) runs.push(current);
   if (runs.length === 0) return null;
   let best = runs[0] as LineRange;
-  if (runs.length === 1) return best;
   // Runs are in line order, so a strict comparison keeps the earliest on a tie.
   let bestScore = changedLines(best, range, diff);
   for (const run of runs.slice(1)) {

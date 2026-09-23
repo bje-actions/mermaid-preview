@@ -37586,8 +37586,6 @@ function anchorRange(range, diff) {
     if (runs.length === 0)
         return null;
     let best = runs[0];
-    if (runs.length === 1)
-        return best;
     // Runs are in line order, so a strict comparison keeps the earliest on a tie.
     let bestScore = changedLines(best, range, diff);
     for (const run of runs.slice(1)) {
@@ -37699,8 +37697,8 @@ function keyOf(body) {
     const match = /^<!-- mermaid-preview: (.+?) -->/m.exec(body);
     return match === null ? null : match[1];
 }
-function buildBody(key, code, options) {
-    const links = previewLinks(code, options.theme);
+/** `links` are `code`'s on the `theme` input, which `plan` also keeps as the comment's `link`. */
+function buildBody(key, code, links, options) {
     const lines = [
         marker(key),
         // The view URL rides along hidden, for tooling that reads the raw body
@@ -37767,13 +37765,14 @@ function plan(files, existing, options) {
             if (anchor === null)
                 throw new Error(`no anchor for a changed block at ${file.path}:${range.start}`);
             const key = commentKey(file.path, block.ordinal);
+            const links = previewLinks(block.code, options.theme);
             desired.set(key, {
                 key,
                 path: file.path,
                 startLine: anchor.start,
                 line: anchor.end,
-                body: buildBody(key, block.code, options),
-                link: previewLinks(block.code, options.theme).edit,
+                body: buildBody(key, block.code, links, options),
+                link: links.edit,
             });
         }
     }
