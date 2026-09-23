@@ -8,7 +8,7 @@ name: Release
 #
 # The first Marketplace listing has to be made once by hand: draft a release
 # in the GitHub UI with "Publish this Action to the GitHub Marketplace" ticked.
-# See README.md, Publishing.
+# See CONTRIBUTING.md, Marketplace.
 
 on:
   push:

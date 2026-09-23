@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-See `README.md` for what the action does and `docs/design.md` for why each rule is the way it is.
+See `README.md` for what the action does, `CONTRIBUTING.md` for the development setup and releases, and `docs/design.md` for why each rule is the way it is.
 
 ## Layout
 
