@@ -3,7 +3,8 @@
 // fence rules closely enough for the cases a repository's docs produce: a
 // fence is three or more backticks or tildes with up to three spaces of
 // indentation; it closes on a fence of the same character at least as long;
-// a fence inside a longer fence of the other kind is content, not a block.
+// inside an open block, a fence of the other character, or a shorter fence
+// of the same character, is content, not a block.
 
 export interface MermaidBlock {
   /** Zero-based position among the mermaid blocks of the same file. */

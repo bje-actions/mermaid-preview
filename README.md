@@ -58,7 +58,8 @@ No checkout is needed: the action reads the changed files through the API. The d
 - Comments are identified by an HTML marker carrying the file path and the block's ordinal in
   that file, so the action never touches a human's comment.
 - On a fork pull request the default token is read-only; the links are written to the job
-  summary and the run stays green with `outcome: read-only`.
+  summary and the run stays green with `outcome: read-only`. On a same-repository pull request a
+  write failure fails the run, so a job that forgot `pull-requests: write` is not silently green.
 
 `docs/design.md` records the reasoning behind each rule.
 
@@ -76,7 +77,7 @@ tick "Publish this Action to the GitHub Marketplace".
 
 ```bash
 pnpm install     # also installs the lefthook pre-commit hooks
-pnpm test        # vitest, 100% coverage thresholds
+pnpm test        # vitest with coverage, 100% thresholds
 pnpm typecheck
 pnpm lint
 pnpm build       # writes dist/, which is committed; CI refuses a stale dist

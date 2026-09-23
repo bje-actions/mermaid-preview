@@ -1,8 +1,9 @@
 import type { PullRequestClient } from './github';
-import { isForbidden } from './github';
-import { type ChangedFile, type Plan, plan } from './plan';
+import { isPermissionDenied, messageOf, statusOf } from './github';
+import { type ChangedFile, type DesiredComment, isMarkdown, type Plan, plan } from './plan';
 
-export type Outcome = 'completed' | 'read-only' | 'failed';
+/** What `run` reports; `failed` is the action's third output value, set by `main.ts`. */
+export type Outcome = 'completed' | 'read-only';
 
 export interface RunResult {
   outcome: Outcome;
@@ -18,21 +19,31 @@ export interface Reporter {
   warning(message: string): void;
 }
 
+export interface RunOptions {
+  theme: string;
+  /**
+   * True on a pull request from a fork, whose default token cannot write
+   * review comments: a permission failure then falls back to the job
+   * summary instead of failing the run.
+   */
+  allowReadOnly: boolean;
+}
+
 export async function run(
   client: PullRequestClient,
-  theme: string,
+  options: RunOptions,
   report: Reporter,
 ): Promise<RunResult> {
   const files: ChangedFile[] = [];
   for (const file of await client.listChangedFiles()) {
-    if (file.status !== 'removed' && /\.(md|markdown|mdx)$/i.test(file.path)) {
-      files.push({ ...file, content: await client.readHeadFile(file.path) });
+    if (file.status !== 'removed' && isMarkdown(file.path)) {
+      files.push({ ...file, ...(await client.readHeadFile(file.path)) });
     } else {
       files.push(file);
     }
   }
   const existing = await client.listReviewComments();
-  const planned = plan(files, existing, theme);
+  const planned = plan(files, existing, options.theme);
   const summary: string[] = [];
   for (const skip of planned.skipped) {
     report.warning(`${skip.path}: skipped, ${skip.reason}`);
@@ -40,27 +51,39 @@ export async function run(
   }
 
   let comments = 0;
+  let current: DesiredComment | undefined;
   try {
     for (const comment of planned.remove) {
       await client.deleteReviewComment(comment.id);
       report.info(`removed comment for ${comment.key}`);
     }
     for (const comment of planned.update) {
+      current = comment;
       await client.updateReviewComment(comment.id, comment.body);
       comments += 1;
     }
     for (const comment of planned.create) {
+      current = comment;
       await client.createReviewComment(comment);
       report.info(`commented on ${comment.key} lines ${comment.startLine}-${comment.line}`);
       comments += 1;
     }
   } catch (error) {
-    if (!isForbidden(error)) throw error;
-    // A fork pull request's token cannot write review comments. The links are
-    // still useful, so they go to the job summary and the run stays green.
-    report.warning('the token cannot write review comments; links are in the job summary');
+    if (!options.allowReadOnly || !isPermissionDenied(error)) {
+      throw new Error(
+        `writing the comment for ${current?.key ?? 'a removed block'}: ${messageOf(error)}` +
+          (options.allowReadOnly ? '' : ' (does the job grant pull-requests: write?)'),
+        { cause: error },
+      );
+    }
+    report.warning(
+      `the token cannot write review comments (${statusOf(error)}: ${messageOf(error)}); ` +
+        `${comments} written before that; links are in the job summary`,
+    );
     for (const comment of [...planned.update, ...planned.create]) {
-      summary.push('', comment.body.replace(/^<!--.*-->\n/, ''));
+      summary.push(
+        `- \`${comment.path}\` lines ${comment.startLine}-${comment.line}: ${comment.body.replace(/^<!--.*-->\n/, '')}`,
+      );
     }
     return { outcome: 'read-only', plan: planned, comments, summary };
   }

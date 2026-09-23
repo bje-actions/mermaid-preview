@@ -6,21 +6,33 @@ import { anchorRange, changedWithin, parsePatch } from './diff';
 import { previewLinks } from './encode';
 import { findMermaidBlocks } from './markdown';
 
+export type FileStatus =
+  | 'added'
+  | 'removed'
+  | 'modified'
+  | 'renamed'
+  | 'copied'
+  | 'changed'
+  | 'unchanged';
+
 export interface ChangedFile {
   path: string;
-  /** GitHub's per-file status: added, modified, renamed, removed, ... */
-  status: string;
-  /** Unified diff for the file; absent when GitHub omits it (too large, binary). */
+  status: FileStatus;
+  /** Added plus deleted lines; 0 for a pure rename. */
+  changes: number;
+  /** Unified diff for the file; absent when GitHub omits it (too large, or a pure rename). */
   patch?: string | undefined;
-  /** Head content; absent for a removed file. */
+  /** Head content; absent for a removed, non-Markdown or unreadable file. */
   content?: string | undefined;
+  /** Why the head content could not be read, when `content` is absent for that reason. */
+  unreadable?: string | undefined;
 }
 
 export interface ExistingComment {
   id: number;
   path: string;
   body: string;
-  /** The last (or only) line of the comment's range. */
+  /** The last (or only) line of the comment's range; null once GitHub marks it outdated. */
   line: number | null;
   /** The first line of a multi-line comment; null for a single-line one. */
   startLine: number | null;
@@ -36,7 +48,7 @@ export interface DesiredComment {
 
 export interface Plan {
   create: DesiredComment[];
-  update: { id: number; body: string }[];
+  update: (DesiredComment & { id: number })[];
   remove: { id: number; key: string }[];
   /** Files skipped and why, for the job summary. */
   skipped: { path: string; reason: string }[];
@@ -80,12 +92,17 @@ export function plan(files: ChangedFile[], existing: ExistingComment[], theme: s
 
   for (const file of files) {
     if (!isMarkdown(file.path) || file.status === 'removed') continue;
+    // A pure rename has no patch and no changed block; nothing to say.
+    if (file.status === 'renamed' && file.changes === 0) continue;
     if (file.patch === undefined) {
-      skipped.push({ path: file.path, reason: 'GitHub returned no diff for this file' });
+      skipped.push({
+        path: file.path,
+        reason: 'GitHub returned no diff for this file (too large); open it on GitHub instead',
+      });
       continue;
     }
     if (file.content === undefined) {
-      skipped.push({ path: file.path, reason: 'head content could not be read' });
+      skipped.push({ path: file.path, reason: file.unreadable ?? 'head content was not read' });
       continue;
     }
     const diff = parsePatch(file.patch);
@@ -93,8 +110,11 @@ export function plan(files: ChangedFile[], existing: ExistingComment[], theme: s
       const range = { start: block.startLine, end: block.endLine };
       if (!changedWithin(range, diff)) continue;
       const anchor = anchorRange(range, diff);
-      /* v8 ignore next: a changed line is always in the diff, so this cannot happen */
-      if (anchor === null) continue;
+      // `parsePatch` keeps `added` and `deletedBefore` subsets of `inDiff`, so
+      // a changed range always has an in-diff line and the anchor exists.
+      /* v8 ignore next */
+      if (anchor === null)
+        throw new Error(`no anchor for a changed block at ${file.path}:${range.start}`);
       const key = commentKey(file.path, block.ordinal);
       desired.set(key, {
         key,
@@ -119,10 +139,12 @@ export function plan(files: ChangedFile[], existing: ExistingComment[], theme: s
       continue;
     }
     seen.add(key);
+    // An outdated comment has `line: null`, so it never matches and is
+    // replaced, which is what an outdated anchor needs.
     const startLine = comment.startLine ?? comment.line;
     const sameRange = startLine === want.startLine && comment.line === want.line;
     if (sameRange) {
-      if (comment.body !== want.body) result.update.push({ id: comment.id, body: want.body });
+      if (comment.body !== want.body) result.update.push({ ...want, id: comment.id });
     } else {
       // The API cannot move a comment's range: replace it.
       result.remove.push({ id: comment.id, key });

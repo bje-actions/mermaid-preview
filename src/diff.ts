@@ -4,14 +4,19 @@
 // only lines a comment may anchor to), which were added, and where a
 // deletion sits (the head line that follows the removed lines), so a block
 // that only lost lines still reads as changed.
+//
+// Invariant: `added` and `deletedBefore` are subsets of `inDiff`. A deletion
+// is recorded only once a following context or added line lands in the same
+// hunk; a hunk that ends on `-` lines (end of file) records nothing, since no
+// head line follows.
 
 export interface DiffLines {
   /** Head lines that appear in some hunk: context or added. */
-  inDiff: Set<number>;
+  inDiff: ReadonlySet<number>;
   /** Head lines marked `+`. */
-  added: Set<number>;
+  added: ReadonlySet<number>;
   /** Head line numbers immediately after a run of `-` lines. */
-  deletedBefore: Set<number>;
+  deletedBefore: ReadonlySet<number>;
 }
 
 const HUNK = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
@@ -22,19 +27,25 @@ export function parsePatch(patch: string): DiffLines {
   const deletedBefore = new Set<number>();
   let line = 0;
   let inHunk = false;
+  let pendingDeletion = false;
 
   for (const raw of patch.split('\n')) {
     const hunk = HUNK.exec(raw);
     if (hunk !== null) {
       line = Number(hunk[1]);
       inHunk = true;
+      pendingDeletion = false;
       continue;
     }
     if (!inHunk) continue;
     if (raw.startsWith('\\')) continue; // "\ No newline at end of file"
     if (raw.startsWith('-')) {
-      deletedBefore.add(line);
+      pendingDeletion = true;
       continue;
+    }
+    if (pendingDeletion) {
+      deletedBefore.add(line);
+      pendingDeletion = false;
     }
     if (raw.startsWith('+')) added.add(line);
     inDiff.add(line);
@@ -44,17 +55,28 @@ export function parsePatch(patch: string): DiffLines {
   return { inDiff, added, deletedBefore };
 }
 
+/** 1-based, inclusive, `start <= end`. */
 export interface LineRange {
   start: number;
   end: number;
 }
 
-/** True when any line of `range` was added, or a deletion sits inside it. */
+/**
+ * True when a line of `range` was added, or lines were deleted inside it.
+ * A deletion recorded at `range.start` sits above the range's first line
+ * (text removed just before an opening fence), so it does not count.
+ */
 export function changedWithin(range: LineRange, diff: DiffLines): boolean {
-  for (let line = range.start; line <= range.end; line += 1) {
-    if (diff.added.has(line) || diff.deletedBefore.has(line)) return true;
+  return changedLines(range, range, diff) > 0;
+}
+
+/** Changed lines of `run`, a sub-range of the block `block`. */
+function changedLines(run: LineRange, block: LineRange, diff: DiffLines): number {
+  let changed = 0;
+  for (let line = run.start; line <= run.end; line += 1) {
+    if (diff.added.has(line) || (line > block.start && diff.deletedBefore.has(line))) changed += 1;
   }
-  return false;
+  return changed;
 }
 
 export interface Anchor extends LineRange {
@@ -64,9 +86,9 @@ export interface Anchor extends LineRange {
 
 /**
  * The line range a review comment on `range` may take. The whole range when
- * every line of it is in a hunk; otherwise the longest contiguous in-hunk run
- * inside the range that holds the most changed lines, marked partial; null
- * when no line of the range is in the diff at all.
+ * every line of it is in a hunk; otherwise the contiguous in-hunk run inside
+ * the range holding the most changed lines (the earliest on a tie), marked
+ * partial; null when no line of the range is in the diff at all.
  */
 export function anchorRange(range: LineRange, diff: DiffLines): Anchor | null {
   const runs: LineRange[] = [];
@@ -87,15 +109,7 @@ export function anchorRange(range: LineRange, diff: DiffLines): Anchor | null {
     return { ...whole, partial: false };
   }
   const best = runs
-    .map((run) => ({ run, score: score(run, diff) }))
+    .map((run) => ({ run, score: changedLines(run, range, diff) }))
     .sort((a, b) => b.score - a.score || a.run.start - b.run.start)[0] as { run: LineRange };
   return { ...best.run, partial: true };
-}
-
-function score(run: LineRange, diff: DiffLines): number {
-  let changed = 0;
-  for (let line = run.start; line <= run.end; line += 1) {
-    if (diff.added.has(line) || diff.deletedBefore.has(line)) changed += 1;
-  }
-  return changed;
 }

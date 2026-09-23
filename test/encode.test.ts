@@ -1,10 +1,6 @@
-import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import { encodeState, previewLinks } from '../src/encode';
-
-function decode(encoded: string): { code: string; mermaid: string } {
-  return JSON.parse(inflateSync(Buffer.from(encoded, 'base64url')).toString('utf8'));
-}
+import { decode } from './helpers';
 
 describe('encodeState', () => {
   it('round-trips the diagram and a stringified config, as mermaid.live expects', () => {
@@ -13,15 +9,19 @@ describe('encodeState', () => {
     expect(JSON.parse(state.mermaid)).toEqual({ theme: 'dark' });
   });
 
-  it('uses base64url without padding', () => {
-    expect(encodeState('x', 'default')).toMatch(/^[A-Za-z0-9_-]+$/);
+  it('produces the exact bytes mermaid.live receives: deflate level 9, base64url, no padding', () => {
+    // Pinned from a run that mermaid.ink rendered (HTTP 200) on 2026-09-22.
+    expect(encodeState('graph TD\n  a --> b', 'default')).toBe(
+      'eNqrVkrOT0lVslJKL0osyFAIcYnJU1BIVNDVtVNIUtJRyk0tyk3MTFGyUqqOUSrJSM1NjVGyilFKSU1LLM0piVGqVaoFAKEoFLQ',
+    );
   });
 });
 
 describe('previewLinks', () => {
   it('builds the view and edit routes from one encoding', () => {
     const links = previewLinks('graph TD', 'default');
-    const encoded = links.view.slice('https://mermaid.live/view#pako:'.length);
+    const encoded = encodeState('graph TD', 'default');
+    expect(links.view).toBe(`https://mermaid.live/view#pako:${encoded}`);
     expect(links.edit).toBe(`https://mermaid.live/edit#pako:${encoded}`);
     expect(decode(encoded).code).toBe('graph TD');
   });

@@ -26,8 +26,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # Coverage is reported against the head commit, not the merge commit
-          # that pull_request checks out by default.
+          # The upload attributes the report to the pull request head commit,
+          # so measure that tree rather than the merge commit pull_request
+          # checks out by default.
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: pnpm/action-setup@v6
@@ -43,7 +44,7 @@ jobs:
 
       - run: pnpm lint
 
-      - run: pnpm test --coverage
+      - run: pnpm test
 
       - uses: actions/upload-code-coverage@v1
         with:
@@ -55,14 +56,19 @@ jobs:
         run: |
           pnpm build
           git add --intent-to-add dist
-          if ! git diff --exit-code dist; then
+          git diff --exit-code dist && exit 0
+          status=$?
+          if [ "$status" -eq 1 ]; then
             echo "::error::dist/ does not match src/. Run pnpm build and commit dist/."
-            exit 1
+          else
+            echo "::error::git diff failed with status $status"
           fi
+          exit 1
 
   # Runs this build against this pull request. The fixture under
   # test/fixtures/ carries a mermaid block, so a PR that touches it gets a
-  # real review comment from the action under test.
+  # real review comment from the action under test; a PR that does not
+  # exercises the read path and the empty plan only.
   smoke:
     name: Smoke test on this pull request
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
@@ -79,4 +85,9 @@ jobs:
         uses: ./
 
       - name: The smoke test must have completed
-        run: test "${{ steps.smoke.outputs.outcome }}" = "completed"
+        env:
+          OUTCOME: ${{ steps.smoke.outputs.outcome }}
+          COMMENTS: ${{ steps.smoke.outputs.comments }}
+        run: |
+          echo "outcome=${OUTCOME} comments=${COMMENTS}"
+          test "$OUTCOME" = "completed"

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { ChangedFile, ExistingComment } from '../src/plan';
 import { buildBody, commentKey, isMarkdown, keyOf, marker, plan } from '../src/plan';
+import { decode } from './helpers';
 
 const DOC = ['# T', '```mermaid', 'graph TD', '  a --> b', '```', 'tail'].join('\n');
 // Whole file added.
@@ -15,6 +17,14 @@ const ADDED = [
 const KEY = commentKey('docs/a.md', 0);
 const BODY = buildBody(KEY, 'graph TD\n  a --> b', 'default', false);
 
+function file(over: Partial<ChangedFile> = {}): ChangedFile {
+  return { path: 'docs/a.md', status: 'added', changes: 6, patch: ADDED, content: DOC, ...over };
+}
+
+function existing(over: Partial<ExistingComment> = {}): ExistingComment {
+  return { id: 7, path: 'docs/a.md', body: BODY, line: 5, startLine: 2, ...over };
+}
+
 describe('helpers', () => {
   it('marker and keyOf agree', () => {
     expect(keyOf(`${marker('x.md#2')}\nrest`)).toBe('x.md#2');
@@ -24,21 +34,21 @@ describe('helpers', () => {
     expect(['a.md', 'b.MD', 'c.markdown', 'd.mdx'].every(isMarkdown)).toBe(true);
     expect(isMarkdown('a.ts')).toBe(false);
   });
-  it('buildBody notes a partial anchor', () => {
-    expect(buildBody('k', 'x', 'default', true)).toContain('Only part of this block');
-    expect(BODY).not.toContain('Only part');
-    expect(BODY.startsWith(marker(KEY))).toBe(true);
+  it('buildBody is the marker, one sentence with both links, and a note when partial', () => {
+    const view = /\[view\]\((https:\/\/mermaid\.live\/view#pako:[A-Za-z0-9_-]+)\)/.exec(BODY)?.[1];
+    const edit = view?.replace('/view#', '/edit#');
+    expect(BODY).toBe(
+      `${marker(KEY)}\nPreview this diagram on mermaid.live: [view](${view}) or [edit](${edit}).`,
+    );
+    expect(buildBody('k', 'x', 'default', true)).toBe(
+      `${buildBody('k', 'x', 'default', false)}\n\n_Only part of this block is in the diff, so the comment spans that part._`,
+    );
   });
 });
 
 describe('plan', () => {
   it('creates a full-range comment for a changed block with no existing comment', () => {
-    const result = plan(
-      [{ path: 'docs/a.md', status: 'added', patch: ADDED, content: DOC }],
-      [],
-      'default',
-    );
-    expect(result).toEqual({
+    expect(plan([file()], [], 'default')).toEqual({
       create: [{ key: KEY, path: 'docs/a.md', startLine: 2, line: 5, body: BODY }],
       update: [],
       remove: [],
@@ -46,89 +56,113 @@ describe('plan', () => {
     });
   });
 
-  it('skips non-Markdown, removed files, files without a diff or content', () => {
+  it('encodes the theme into the link', () => {
+    const [created] = plan([file()], [], 'forest').create;
+    const encoded = /view#pako:([A-Za-z0-9_-]+)\)/.exec(created?.body ?? '')?.[1] ?? '';
+    expect(JSON.parse(decode(encoded).mermaid)).toEqual({ theme: 'forest' });
+  });
+
+  it('keys each block by its ordinal in the file, not among the changed blocks', () => {
+    const two = [DOC, '```mermaid', 'pie', '```'].join('\n');
+    // Only the second block (lines 7-9) is in the diff.
+    const patch = ['@@ -6 +6,4 @@', ' tail', '+```mermaid', '+pie', '+```'].join('\n');
+    const result = plan([file({ content: two, patch })], [], 'default');
+    expect(result.create).toEqual([
+      {
+        key: 'docs/a.md#1',
+        path: 'docs/a.md',
+        startLine: 7,
+        line: 9,
+        body: buildBody('docs/a.md#1', 'pie', 'default', false),
+      },
+    ]);
+  });
+
+  it('skips non-Markdown, removed files, pure renames, files without a diff or content', () => {
     const result = plan(
       [
-        { path: 'a.ts', status: 'modified', patch: ADDED, content: DOC },
-        { path: 'gone.md', status: 'removed' },
-        { path: 'big.md', status: 'modified', content: DOC },
-        { path: 'unread.md', status: 'modified', patch: ADDED },
+        file({ path: 'a.ts' }),
+        file({ path: 'gone.md', status: 'removed', patch: undefined, content: undefined }),
+        file({ path: 'moved.md', status: 'renamed', changes: 0, patch: undefined }),
+        file({ path: 'big.md', status: 'modified', patch: undefined }),
+        file({
+          path: 'link.md',
+          content: undefined,
+          unreadable: 'the path is a symlink, not a file',
+        }),
+        file({ path: 'unread.md', content: undefined }),
       ],
       [],
       'default',
     );
     expect(result.create).toEqual([]);
     expect(result.skipped).toEqual([
-      { path: 'big.md', reason: 'GitHub returned no diff for this file' },
-      { path: 'unread.md', reason: 'head content could not be read' },
+      {
+        path: 'big.md',
+        reason: 'GitHub returned no diff for this file (too large); open it on GitHub instead',
+      },
+      { path: 'link.md', reason: 'the path is a symlink, not a file' },
+      { path: 'unread.md', reason: 'head content was not read' },
     ]);
   });
 
-  it('does not comment on a block the diff did not touch', () => {
-    const patch = ['@@ -6 +6 @@', '-old tail', '+tail'].join('\n');
-    const result = plan(
-      [{ path: 'docs/a.md', status: 'modified', patch, content: DOC }],
-      [],
-      'default',
-    );
-    expect(result.create).toEqual([]);
+  it('does not comment on a block the diff did not touch, including a deletion just above it', () => {
+    const tail = ['@@ -6 +6 @@', '-old tail', '+tail'].join('\n');
+    expect(plan([file({ patch: tail })], [], 'default').create).toEqual([]);
+    const above = [
+      '@@ -1,3 +1,2 @@',
+      ' # T',
+      '-removed paragraph',
+      ' ```mermaid',
+      ' graph TD',
+    ].join('\n');
+    expect(plan([file({ patch: above })], [], 'default').create).toEqual([]);
   });
 
   it('updates in place when the range is unchanged and the link changed', () => {
-    const existing = {
-      id: 7,
-      path: 'docs/a.md',
-      body: buildBody(KEY, 'stale', 'default', false),
-      line: 5,
-      startLine: 2,
-    };
-    const result = plan(
-      [{ path: 'docs/a.md', status: 'added', patch: ADDED, content: DOC }],
-      [existing],
-      'default',
-    );
-    expect(result.update).toEqual([{ id: 7, body: BODY }]);
+    const stale = existing({ body: buildBody(KEY, 'stale', 'default', false) });
+    const result = plan([file()], [stale], 'default');
+    expect(result.update).toEqual([
+      { id: 7, key: KEY, path: 'docs/a.md', startLine: 2, line: 5, body: BODY },
+    ]);
     expect(result.create).toEqual([]);
     expect(result.remove).toEqual([]);
   });
 
   it('leaves an up-to-date comment alone', () => {
-    const existing = { id: 7, path: 'docs/a.md', body: BODY, line: 5, startLine: 2 };
-    const result = plan(
-      [{ path: 'docs/a.md', status: 'added', patch: ADDED, content: DOC }],
-      [existing],
-      'default',
-    );
-    expect(result).toEqual({ create: [], update: [], remove: [], skipped: [] });
+    expect(plan([file()], [existing()], 'default')).toEqual({
+      create: [],
+      update: [],
+      remove: [],
+      skipped: [],
+    });
   });
 
-  it('replaces a comment whose range moved, since the API cannot move one', () => {
-    const existing = { id: 7, path: 'docs/a.md', body: BODY, line: 4, startLine: null };
-    const result = plan(
-      [{ path: 'docs/a.md', status: 'added', patch: ADDED, content: DOC }],
-      [existing],
-      'default',
-    );
-    expect(result.remove).toEqual([{ id: 7, key: KEY }]);
-    expect(result.create.map((c) => c.key)).toEqual([KEY]);
+  it('replaces a comment whose range differs at either end, or is outdated', () => {
+    for (const moved of [
+      existing({ line: 4, startLine: null }),
+      existing({ startLine: 3 }),
+      existing({ line: 4 }),
+      existing({ line: null, startLine: null }),
+    ]) {
+      const result = plan([file()], [moved], 'default');
+      expect(result.remove).toEqual([{ id: 7, key: KEY }]);
+      expect(result.create.map((c) => c.key)).toEqual([KEY]);
+      expect(result.update).toEqual([]);
+    }
   });
 
   it('removes a comment for a block that is no longer changed, and duplicates', () => {
-    const stale = {
+    const stale = existing({
       id: 1,
-      path: 'docs/a.md',
       body: buildBody('docs/a.md#3', 'x', 'default', false),
       line: 9,
       startLine: null,
-    };
-    const first = { id: 2, path: 'docs/a.md', body: BODY, line: 5, startLine: 2 };
-    const dup = { id: 3, path: 'docs/a.md', body: BODY, line: 5, startLine: 2 };
-    const human = { id: 4, path: 'docs/a.md', body: 'nice diagram', line: 3, startLine: null };
-    const result = plan(
-      [{ path: 'docs/a.md', status: 'added', patch: ADDED, content: DOC }],
-      [stale, first, dup, human],
-      'default',
-    );
+    });
+    const first = existing({ id: 2 });
+    const dup = existing({ id: 3 });
+    const human = existing({ id: 4, body: 'nice diagram', line: 3, startLine: null });
+    const result = plan([file()], [stale, first, dup, human], 'default');
     expect(result.remove).toEqual([
       { id: 1, key: 'docs/a.md#3' },
       { id: 3, key: KEY },
@@ -141,11 +175,7 @@ describe('plan', () => {
     const long = ['```mermaid', ...Array.from({ length: 12 }, (_, i) => `n${i}`), '```'].join('\n');
     // Only head line 7 changed; the hunk shows 4-10 with three lines of context.
     const patch = ['@@ -4,6 +4,7 @@', ' n2', ' n3', ' n4', '+n5', ' n6', ' n7', ' n8'].join('\n');
-    const result = plan(
-      [{ path: 'x.md', status: 'modified', patch, content: long }],
-      [],
-      'default',
-    );
+    const result = plan([file({ path: 'x.md', content: long, patch })], [], 'default');
     expect(result.create[0]).toMatchObject({ startLine: 4, line: 10 });
     expect(result.create[0]?.body).toContain('Only part of this block');
   });

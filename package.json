@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome ci .",
     "format": "biome format --write .",
-    "test": "vitest run",
+    "test": "vitest run --coverage",
     "prepare": "lefthook install"
   },
   "dependencies": {

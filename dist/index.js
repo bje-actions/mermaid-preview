@@ -37404,22 +37404,31 @@ function createClient(token, pr) {
     const octokit = getOctokit(token);
     const base = { owner: pr.owner, repo: pr.repo };
     return {
-        async listChangedFiles() {
+        listChangedFiles: () => describe('listing changed files', async () => {
             const files = await octokit.paginate(octokit.rest.pulls.listFiles, {
                 ...base,
                 pull_number: pr.number,
                 per_page: 100,
             });
-            return files.map((file) => ({ path: file.filename, status: file.status, patch: file.patch }));
-        },
-        async readHeadFile(path) {
-            const response = await octokit.rest.repos.getContent({ ...base, path, ref: pr.headSha });
-            const data = response.data;
-            if (Array.isArray(data) || data.type !== 'file')
-                return undefined;
-            return Buffer.from(data.content, 'base64').toString('utf8');
-        },
-        async listReviewComments() {
+            return files.map((file) => ({
+                path: file.filename,
+                status: file.status,
+                changes: file.changes,
+                patch: file.patch,
+            }));
+        }),
+        readHeadFile: (path) => describe(`reading ${path} at ${pr.headSha}`, async () => {
+            const { data } = await octokit.rest.repos.getContent({ ...base, path, ref: pr.headSha });
+            if (Array.isArray(data))
+                return { unreadable: 'the path is a directory' };
+            if (data.type !== 'file')
+                return { unreadable: `the path is a ${data.type}, not a file` };
+            // Between 1 MB and 100 MB the contents API sends no content at all.
+            if (data.encoding !== 'base64')
+                return { unreadable: 'the file is too large for the contents API' };
+            return { content: Buffer.from(data.content, 'base64').toString('utf8') };
+        }),
+        listReviewComments: () => describe('listing review comments', async () => {
             const comments = await octokit.paginate(octokit.rest.pulls.listReviewComments, {
                 ...base,
                 pull_number: pr.number,
@@ -37432,7 +37441,7 @@ function createClient(token, pr) {
                 line: comment.line ?? null,
                 startLine: comment.start_line ?? null,
             }));
-        },
+        }),
         async createReviewComment(comment) {
             const range = comment.startLine === comment.line
                 ? {}
@@ -37452,16 +37461,39 @@ function createClient(token, pr) {
             await octokit.rest.pulls.updateReviewComment({ ...base, comment_id: id, body });
         },
         async deleteReviewComment(id) {
-            await octokit.rest.pulls.deleteReviewComment({ ...base, comment_id: id });
+            try {
+                await octokit.rest.pulls.deleteReviewComment({ ...base, comment_id: id });
+            }
+            catch (error) {
+                if (statusOf(error) !== 404)
+                    throw error;
+            }
         },
     };
 }
-/** True for the HTTP status a read-only token (fork pull request) gets on a write. */
-function isForbidden(error) {
-    return (typeof error === 'object' &&
+/** Rethrow with the call named, so a bare Octokit message says what failed. */
+async function describe(what, call) {
+    try {
+        return await call();
+    }
+    catch (error) {
+        throw new Error(`${what}: ${messageOf(error)}`, { cause: error });
+    }
+}
+function statusOf(error) {
+    return typeof error === 'object' &&
         error !== null &&
         'status' in error &&
-        (error.status === 403 || error.status === 404));
+        typeof error.status === 'number'
+        ? error.status
+        : undefined;
+}
+function messageOf(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+/** True for the 403 a token without `pull-requests: write` gets on a write. */
+function isPermissionDenied(error) {
+    return statusOf(error) === 403;
 }
 
 ;// CONCATENATED MODULE: ./build/diff.js
@@ -37471,6 +37503,11 @@ function isForbidden(error) {
 // only lines a comment may anchor to), which were added, and where a
 // deletion sits (the head line that follows the removed lines), so a block
 // that only lost lines still reads as changed.
+//
+// Invariant: `added` and `deletedBefore` are subsets of `inDiff`. A deletion
+// is recorded only once a following context or added line lands in the same
+// hunk; a hunk that ends on `-` lines (end of file) records nothing, since no
+// head line follows.
 const HUNK = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
 function parsePatch(patch) {
     const inDiff = new Set();
@@ -37478,11 +37515,13 @@ function parsePatch(patch) {
     const deletedBefore = new Set();
     let line = 0;
     let inHunk = false;
+    let pendingDeletion = false;
     for (const raw of patch.split('\n')) {
         const hunk = HUNK.exec(raw);
         if (hunk !== null) {
             line = Number(hunk[1]);
             inHunk = true;
+            pendingDeletion = false;
             continue;
         }
         if (!inHunk)
@@ -37490,8 +37529,12 @@ function parsePatch(patch) {
         if (raw.startsWith('\\'))
             continue; // "\ No newline at end of file"
         if (raw.startsWith('-')) {
-            deletedBefore.add(line);
+            pendingDeletion = true;
             continue;
+        }
+        if (pendingDeletion) {
+            deletedBefore.add(line);
+            pendingDeletion = false;
         }
         if (raw.startsWith('+'))
             added.add(line);
@@ -37500,19 +37543,28 @@ function parsePatch(patch) {
     }
     return { inDiff, added, deletedBefore };
 }
-/** True when any line of `range` was added, or a deletion sits inside it. */
+/**
+ * True when a line of `range` was added, or lines were deleted inside it.
+ * A deletion recorded at `range.start` sits above the range's first line
+ * (text removed just before an opening fence), so it does not count.
+ */
 function changedWithin(range, diff) {
-    for (let line = range.start; line <= range.end; line += 1) {
-        if (diff.added.has(line) || diff.deletedBefore.has(line))
-            return true;
+    return changedLines(range, range, diff) > 0;
+}
+/** Changed lines of `run`, a sub-range of the block `block`. */
+function changedLines(run, block, diff) {
+    let changed = 0;
+    for (let line = run.start; line <= run.end; line += 1) {
+        if (diff.added.has(line) || (line > block.start && diff.deletedBefore.has(line)))
+            changed += 1;
     }
-    return false;
+    return changed;
 }
 /**
  * The line range a review comment on `range` may take. The whole range when
- * every line of it is in a hunk; otherwise the longest contiguous in-hunk run
- * inside the range that holds the most changed lines, marked partial; null
- * when no line of the range is in the diff at all.
+ * every line of it is in a hunk; otherwise the contiguous in-hunk run inside
+ * the range holding the most changed lines (the earliest on a tie), marked
+ * partial; null when no line of the range is in the diff at all.
  */
 function anchorRange(range, diff) {
     const runs = [];
@@ -37538,17 +37590,9 @@ function anchorRange(range, diff) {
         return { ...whole, partial: false };
     }
     const best = runs
-        .map((run) => ({ run, score: score(run, diff) }))
+        .map((run) => ({ run, score: changedLines(run, range, diff) }))
         .sort((a, b) => b.score - a.score || a.run.start - b.run.start)[0];
     return { ...best.run, partial: true };
-}
-function score(run, diff) {
-    let changed = 0;
-    for (let line = run.start; line <= run.end; line += 1) {
-        if (diff.added.has(line) || diff.deletedBefore.has(line))
-            changed += 1;
-    }
-    return changed;
 }
 
 // EXTERNAL MODULE: external "node:zlib"
@@ -37574,7 +37618,8 @@ function previewLinks(diagram, theme) {
 // fence rules closely enough for the cases a repository's docs produce: a
 // fence is three or more backticks or tildes with up to three spaces of
 // indentation; it closes on a fence of the same character at least as long;
-// a fence inside a longer fence of the other kind is content, not a block.
+// inside an open block, a fence of the other character, or a shorter fence
+// of the same character, is content, not a block.
 const OPEN = /^ {0,3}(`{3,}|~{3,})[ \t]*([^`\s]*)/;
 function findMermaidBlocks(markdown) {
     const lines = markdown.split(/\r?\n/);
@@ -37657,12 +37702,18 @@ function plan(files, existing, theme) {
     for (const file of files) {
         if (!isMarkdown(file.path) || file.status === 'removed')
             continue;
+        // A pure rename has no patch and no changed block; nothing to say.
+        if (file.status === 'renamed' && file.changes === 0)
+            continue;
         if (file.patch === undefined) {
-            skipped.push({ path: file.path, reason: 'GitHub returned no diff for this file' });
+            skipped.push({
+                path: file.path,
+                reason: 'GitHub returned no diff for this file (too large); open it on GitHub instead',
+            });
             continue;
         }
         if (file.content === undefined) {
-            skipped.push({ path: file.path, reason: 'head content could not be read' });
+            skipped.push({ path: file.path, reason: file.unreadable ?? 'head content was not read' });
             continue;
         }
         const diff = parsePatch(file.patch);
@@ -37671,9 +37722,11 @@ function plan(files, existing, theme) {
             if (!changedWithin(range, diff))
                 continue;
             const anchor = anchorRange(range, diff);
-            /* v8 ignore next: a changed line is always in the diff, so this cannot happen */
+            // `parsePatch` keeps `added` and `deletedBefore` subsets of `inDiff`, so
+            // a changed range always has an in-diff line and the anchor exists.
+            /* v8 ignore next */
             if (anchor === null)
-                continue;
+                throw new Error(`no anchor for a changed block at ${file.path}:${range.start}`);
             const key = commentKey(file.path, block.ordinal);
             desired.set(key, {
                 key,
@@ -37698,11 +37751,13 @@ function plan(files, existing, theme) {
             continue;
         }
         seen.add(key);
+        // An outdated comment has `line: null`, so it never matches and is
+        // replaced, which is what an outdated anchor needs.
         const startLine = comment.startLine ?? comment.line;
         const sameRange = startLine === want.startLine && comment.line === want.line;
         if (sameRange) {
             if (comment.body !== want.body)
-                result.update.push({ id: comment.id, body: want.body });
+                result.update.push({ ...want, id: comment.id });
         }
         else {
             // The API cannot move a comment's range: replace it.
@@ -37720,47 +37775,51 @@ function plan(files, existing, theme) {
 ;// CONCATENATED MODULE: ./build/run.js
 
 
-async function run(client, theme, report) {
+async function run(client, options, report) {
     const files = [];
     for (const file of await client.listChangedFiles()) {
-        if (file.status !== 'removed' && /\.(md|markdown|mdx)$/i.test(file.path)) {
-            files.push({ ...file, content: await client.readHeadFile(file.path) });
+        if (file.status !== 'removed' && isMarkdown(file.path)) {
+            files.push({ ...file, ...(await client.readHeadFile(file.path)) });
         }
         else {
             files.push(file);
         }
     }
     const existing = await client.listReviewComments();
-    const planned = plan(files, existing, theme);
+    const planned = plan(files, existing, options.theme);
     const summary = [];
     for (const skip of planned.skipped) {
         report.warning(`${skip.path}: skipped, ${skip.reason}`);
         summary.push(`- \`${skip.path}\`: skipped, ${skip.reason}`);
     }
     let comments = 0;
+    let current;
     try {
         for (const comment of planned.remove) {
             await client.deleteReviewComment(comment.id);
             report.info(`removed comment for ${comment.key}`);
         }
         for (const comment of planned.update) {
+            current = comment;
             await client.updateReviewComment(comment.id, comment.body);
             comments += 1;
         }
         for (const comment of planned.create) {
+            current = comment;
             await client.createReviewComment(comment);
             report.info(`commented on ${comment.key} lines ${comment.startLine}-${comment.line}`);
             comments += 1;
         }
     }
     catch (error) {
-        if (!isForbidden(error))
-            throw error;
-        // A fork pull request's token cannot write review comments. The links are
-        // still useful, so they go to the job summary and the run stays green.
-        report.warning('the token cannot write review comments; links are in the job summary');
+        if (!options.allowReadOnly || !isPermissionDenied(error)) {
+            throw new Error(`writing the comment for ${current?.key ?? 'a removed block'}: ${messageOf(error)}` +
+                (options.allowReadOnly ? '' : ' (does the job grant pull-requests: write?)'), { cause: error });
+        }
+        report.warning(`the token cannot write review comments (${statusOf(error)}: ${messageOf(error)}); ` +
+            `${comments} written before that; links are in the job summary`);
         for (const comment of [...planned.update, ...planned.create]) {
-            summary.push('', comment.body.replace(/^<!--.*-->\n/, ''));
+            summary.push(`- \`${comment.path}\` lines ${comment.startLine}-${comment.line}: ${comment.body.replace(/^<!--.*-->\n/, '')}`);
         }
         return { outcome: 'read-only', plan: planned, comments, summary };
     }
@@ -37774,16 +37833,23 @@ async function run(client, theme, report) {
 
 async function main() {
     const token = getInput('token', { required: true });
-    const number = Number(getInput('pr-number') || github_context.payload.pull_request?.number);
+    const input = getInput('pr-number');
+    const event = github_context.payload.pull_request;
+    const number = input === '' ? event?.number : Number(input);
+    if (number === undefined) {
+        throw new Error('no pull request: run on a pull_request event or pass pr-number');
+    }
     if (!Number.isInteger(number) || number <= 0) {
-        throw new Error('no pull request: run on pull_request or pass pr-number');
+        throw new Error(`pr-number must be a positive integer, got '${input}'`);
     }
     const ref = { owner: github_context.repo.owner, repo: github_context.repo.repo, number };
-    const headSha = github_context.payload.pull_request?.number === number
-        ? github_context.payload.pull_request.head.sha
-        : await headShaOf(token, ref);
+    const headSha = event?.number === number ? event.head.sha : await headShaOf(token, ref);
+    const headRepo = event?.head?.repo?.full_name;
     const client = createClient(token, { ...ref, headSha });
-    const result = await run(client, getInput('theme') || 'default', core_namespaceObject);
+    const result = await run(client, {
+        theme: getInput('theme') || 'default',
+        allowReadOnly: headRepo !== undefined && headRepo !== `${ref.owner}/${ref.repo}`,
+    }, core_namespaceObject);
     if (result.summary.length > 0) {
         await summary.addHeading('Mermaid preview').addRaw(result.summary.join('\n')).write();
     }
@@ -37792,6 +37858,9 @@ async function main() {
 }
 main().catch((error) => {
     setOutput('outcome', 'failed');
+    setOutput('comments', '0');
+    if (error instanceof Error && error.stack !== undefined)
+        debug(error.stack);
     setFailed(error instanceof Error ? error.message : String(error));
 });
 

@@ -28,6 +28,22 @@ describe('findMermaidBlocks', () => {
     ]);
   });
 
+  it('takes the first word of the info string only', () => {
+    const md = ['```mermaid title="x"', 'graph LR', '```', '```mermaidx', 'no', '```'].join('\n');
+    expect(findMermaidBlocks(md)).toEqual([
+      { ordinal: 0, startLine: 1, endLine: 3, code: 'graph LR' },
+    ]);
+  });
+
+  it('allows up to three spaces of fence indentation, not four', () => {
+    const two = ['  ```mermaid', '  graph LR', '  ```'].join('\n');
+    expect(findMermaidBlocks(two)).toEqual([
+      { ordinal: 0, startLine: 1, endLine: 3, code: '  graph LR' },
+    ]);
+    const four = ['    ```mermaid', '    graph LR', '    ```'].join('\n');
+    expect(findMermaidBlocks(four)).toEqual([]);
+  });
+
   it('treats a mermaid fence inside a longer fence as content', () => {
     const md = ['````md', '```mermaid', 'graph TD', '```', '````'].join('\n');
     expect(findMermaidBlocks(md)).toEqual([]);
