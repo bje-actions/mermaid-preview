@@ -1,6 +1,89 @@
 import { inflateSync } from 'node:zlib';
+import type { HeadFile, PullRequestClient } from '../src/github';
+import type { ChangedFile, ExistingComment } from '../src/plan';
 
 /** Invert `encodeState`: the state object mermaid.live reads from a `pako:` fragment. */
 export function decode(encoded: string): { code: string; mermaid: string } {
   return JSON.parse(inflateSync(Buffer.from(encoded, 'base64url')).toString('utf8'));
+}
+
+/**
+ * `pako:` fragments pinned from runs that mermaid.ink rendered (HTTP 200) on
+ * 2026-09-22, keyed by diagram source and theme. Expected values in the tests
+ * come from here, never from `encodeState` itself.
+ */
+export const PAKO = {
+  'graph TD|default':
+    'eNqrVkrOT0lVslJKL0osyFAIcVHSUcpNLcpNzExRslKqjlEqyUjNTY1RsopRSklNSyzNKYlRqlWqBQDvWBIP',
+  'graph TD|dark':
+    'eNqrVkrOT0lVslJKL0osyFAIcVHSUcpNLcpNzExRslKqjlEqyUjNTY1RsopRSkksyo5RqlWqBQC5FBDM',
+  'graph TD\n  a --> b|default':
+    'eNqrVkrOT0lVslJKL0osyFAIcYnJU1BIVNDVtVNIUtJRyk0tyk3MTFGyUqqOUSrJSM1NjVGyilFKSU1LLM0piVGqVaoFAKEoFLQ',
+  'pie|default': 'eNqrVkrOT0lVslIqyExV0lHKTS3KTcxMUbJSqo5RKslIzU2NUbKKUUpJTUsszSmJUapVqgUAm8wQgw',
+} as const;
+
+/** The comment body the action writes, spelled out rather than built by the code under test. */
+export function body(key: string, pako: string, partial = false): string {
+  const links = `[view](https://mermaid.live/view#pako:${pako}) or [edit](https://mermaid.live/edit#pako:${pako})`;
+  const note = partial
+    ? '\n\n_Only part of this block is in the diff, so the comment spans that part._'
+    : '';
+  return `<!-- mermaid-preview: ${key} -->\nPreview this diagram on mermaid.live: ${links}.${note}`;
+}
+
+export interface FakeOptions {
+  files: ChangedFile[];
+  /** Head content by path; a path not listed throws, as the real adapter does for a missing file. */
+  head: Record<string, HeadFile>;
+  comments?: ExistingComment[];
+  /** Thrown by every write, to stand in for the GitHub API refusing one. */
+  writeError?: unknown;
+}
+
+/**
+ * A fake of the one system boundary, the GitHub pull request API, that holds
+ * the review comments in memory so a test asserts what is on the pull
+ * request afterwards rather than which calls were made.
+ */
+export function fakePullRequest(options: FakeOptions): PullRequestClient & {
+  comments: ExistingComment[];
+} {
+  const comments = [...(options.comments ?? [])];
+  let nextId = 100;
+  const write = async (change: () => void) => {
+    if (options.writeError !== undefined) throw options.writeError;
+    change();
+  };
+  return {
+    comments,
+    listChangedFiles: async () => options.files,
+    readHeadFile: async (path) => {
+      const found = options.head[path];
+      if (found === undefined) throw new Error(`reading ${path}: Not Found`);
+      return found;
+    },
+    listReviewComments: async () => [...comments],
+    createReviewComment: (c) =>
+      write(() => {
+        comments.push({
+          id: nextId++,
+          path: c.path,
+          body: c.body,
+          line: c.line,
+          startLine: c.startLine === c.line ? null : c.startLine,
+        });
+      }),
+    updateReviewComment: (id, newBody) =>
+      write(() => {
+        const found = comments.find((c) => c.id === id);
+        if (found === undefined) throw new Error(`update ${id}: Not Found`);
+        found.body = newBody;
+      }),
+    deleteReviewComment: (id) =>
+      write(() => {
+        // Already gone is not an error, as in the real adapter.
+        const index = comments.findIndex((c) => c.id === id);
+        if (index >= 0) comments.splice(index, 1);
+      }),
+  };
 }

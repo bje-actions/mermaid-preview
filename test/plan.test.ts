@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ChangedFile, ExistingComment } from '../src/plan';
-import { buildBody, commentKey, isMarkdown, keyOf, marker, plan } from '../src/plan';
-import { decode } from './helpers';
+import { plan } from '../src/plan';
+import { body, decode, PAKO } from './helpers';
 
 const DOC = ['# T', '```mermaid', 'graph TD', '  a --> b', '```', 'tail'].join('\n');
 // Whole file added.
@@ -14,8 +14,8 @@ const ADDED = [
   '+```',
   '+tail',
 ].join('\n');
-const KEY = commentKey('docs/a.md', 0);
-const BODY = buildBody(KEY, 'graph TD\n  a --> b', 'default', false);
+const KEY = 'docs/a.md#0';
+const BODY = body(KEY, PAKO['graph TD\n  a --> b|default']);
 
 function file(over: Partial<ChangedFile> = {}): ChangedFile {
   return { path: 'docs/a.md', status: 'added', changes: 6, patch: ADDED, content: DOC, ...over };
@@ -24,27 +24,6 @@ function file(over: Partial<ChangedFile> = {}): ChangedFile {
 function existing(over: Partial<ExistingComment> = {}): ExistingComment {
   return { id: 7, path: 'docs/a.md', body: BODY, line: 5, startLine: 2, ...over };
 }
-
-describe('helpers', () => {
-  it('marker and keyOf agree', () => {
-    expect(keyOf(`${marker('x.md#2')}\nrest`)).toBe('x.md#2');
-    expect(keyOf('no marker')).toBeNull();
-  });
-  it('isMarkdown matches the Markdown extensions only', () => {
-    expect(['a.md', 'b.MD', 'c.markdown', 'd.mdx'].every(isMarkdown)).toBe(true);
-    expect(isMarkdown('a.ts')).toBe(false);
-  });
-  it('buildBody is the marker, one sentence with both links, and a note when partial', () => {
-    const view = /\[view\]\((https:\/\/mermaid\.live\/view#pako:[A-Za-z0-9_-]+)\)/.exec(BODY)?.[1];
-    const edit = view?.replace('/view#', '/edit#');
-    expect(BODY).toBe(
-      `${marker(KEY)}\nPreview this diagram on mermaid.live: [view](${view}) or [edit](${edit}).`,
-    );
-    expect(buildBody('k', 'x', 'default', true)).toBe(
-      `${buildBody('k', 'x', 'default', false)}\n\n_Only part of this block is in the diff, so the comment spans that part._`,
-    );
-  });
-});
 
 describe('plan', () => {
   it('creates a full-range comment for a changed block with no existing comment', () => {
@@ -66,22 +45,30 @@ describe('plan', () => {
     const two = [DOC, '```mermaid', 'pie', '```'].join('\n');
     // Only the second block (lines 7-9) is in the diff.
     const patch = ['@@ -6 +6,4 @@', ' tail', '+```mermaid', '+pie', '+```'].join('\n');
-    const result = plan([file({ content: two, patch })], [], 'default');
-    expect(result.create).toEqual([
+    expect(plan([file({ content: two, patch })], [], 'default').create).toEqual([
       {
         key: 'docs/a.md#1',
         path: 'docs/a.md',
         startLine: 7,
         line: 9,
-        body: buildBody('docs/a.md#1', 'pie', 'default', false),
+        body: body('docs/a.md#1', PAKO['pie|default']),
       },
     ]);
   });
 
-  it('skips non-Markdown, removed files, pure renames, files without a diff or content', () => {
+  it('considers every Markdown extension and nothing else', () => {
+    const paths = ['a.md', 'b.MD', 'c.markdown', 'd.mdx', 'e.ts', 'f.mdown'];
+    const result = plan(
+      paths.map((path) => file({ path })),
+      [],
+      'default',
+    );
+    expect(result.create.map((c) => c.path)).toEqual(['a.md', 'b.MD', 'c.markdown', 'd.mdx']);
+  });
+
+  it('skips removed files, pure renames, files without a diff or content', () => {
     const result = plan(
       [
-        file({ path: 'a.ts' }),
         file({ path: 'gone.md', status: 'removed', patch: undefined, content: undefined }),
         file({ path: 'moved.md', status: 'renamed', changes: 0, patch: undefined }),
         file({ path: 'big.md', status: 'modified', patch: undefined }),
@@ -120,7 +107,7 @@ describe('plan', () => {
   });
 
   it('updates in place when the range is unchanged and the link changed', () => {
-    const stale = existing({ body: buildBody(KEY, 'stale', 'default', false) });
+    const stale = existing({ body: body(KEY, 'stale') });
     const result = plan([file()], [stale], 'default');
     expect(result.update).toEqual([
       { id: 7, key: KEY, path: 'docs/a.md', startLine: 2, line: 5, body: BODY },
@@ -152,13 +139,8 @@ describe('plan', () => {
     }
   });
 
-  it('removes a comment for a block that is no longer changed, and duplicates', () => {
-    const stale = existing({
-      id: 1,
-      body: buildBody('docs/a.md#3', 'x', 'default', false),
-      line: 9,
-      startLine: null,
-    });
+  it('removes a comment for a block that is no longer changed, and duplicates; leaves human comments', () => {
+    const stale = existing({ id: 1, body: body('docs/a.md#3', 'x'), line: 9, startLine: null });
     const first = existing({ id: 2 });
     const dup = existing({ id: 3 });
     const human = existing({ id: 4, body: 'nice diagram', line: 3, startLine: null });
@@ -171,12 +153,16 @@ describe('plan', () => {
     expect(result.update).toEqual([]);
   });
 
-  it('anchors partially when the block is longer than the hunk', () => {
+  it('anchors partially when the block is longer than the hunk, and says so', () => {
     const long = ['```mermaid', ...Array.from({ length: 12 }, (_, i) => `n${i}`), '```'].join('\n');
     // Only head line 7 changed; the hunk shows 4-10 with three lines of context.
     const patch = ['@@ -4,6 +4,7 @@', ' n2', ' n3', ' n4', '+n5', ' n6', ' n7', ' n8'].join('\n');
-    const result = plan([file({ path: 'x.md', content: long, patch })], [], 'default');
-    expect(result.create[0]).toMatchObject({ startLine: 4, line: 10 });
-    expect(result.create[0]?.body).toContain('Only part of this block');
+    const [created] = plan([file({ path: 'x.md', content: long, patch })], [], 'default').create;
+    expect(created).toMatchObject({ key: 'x.md#0', startLine: 4, line: 10 });
+    expect(
+      created?.body.endsWith(
+        '\n\n_Only part of this block is in the diff, so the comment spans that part._',
+      ),
+    ).toBe(true);
   });
 });
