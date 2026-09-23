@@ -1,0 +1,26 @@
+name: 'Mermaid preview'
+description: 'Comments a mermaid.live preview link on every changed mermaid code block in a pull request''s Markdown files, and keeps the comment current as the block changes.'
+author: 'bje-actions'
+branding:
+  icon: 'git-pull-request'
+  color: 'purple'
+inputs:
+  token:
+    description: 'Token for the pull request API calls. Needs pull-requests: write. The default GITHUB_TOKEN is enough for same-repository pull requests.'
+    required: false
+    default: ${{ github.token }}
+  pr-number:
+    description: 'Pull request number. Defaults to the pull request that triggered the run.'
+    required: false
+  theme:
+    description: 'Mermaid theme name encoded into the preview link (default, dark, forest, neutral, or a custom name).'
+    required: false
+    default: 'default'
+outputs:
+  outcome:
+    description: 'completed when every comment was synced, read-only when the token could not write review comments (fork pull request) and the links went to the job summary instead, failed otherwise.'
+  comments:
+    description: 'Number of review comments created or updated.'
+runs:
+  using: 'node24'
+  main: 'dist/index.js'

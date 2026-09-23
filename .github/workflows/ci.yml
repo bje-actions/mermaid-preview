@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      # actions/upload-code-coverage writes a code quality report against the
+      # head commit, which feeds the enterprise Code Coverage ruleset.
+      code-quality: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Coverage is reported against the head commit, not the merge commit
+          # that pull_request checks out by default.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm typecheck
+
+      - run: pnpm lint
+
+      - run: pnpm test --coverage
+
+      - uses: actions/upload-code-coverage@v1
+        with:
+          file: coverage/cobertura-coverage.xml
+          language: TypeScript
+          label: code-coverage/vitest
+
+      - name: dist must match src
+        run: |
+          pnpm build
+          git add --intent-to-add dist
+          if ! git diff --exit-code dist; then
+            echo "::error::dist/ does not match src/. Run pnpm build and commit dist/."
+            exit 1
+          fi
+
+  # Runs this build against this pull request. The fixture under
+  # test/fixtures/ carries a mermaid block, so a PR that touches it gets a
+  # real review comment from the action under test.
+  smoke:
+    name: Smoke test on this pull request
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run this build against this pull request
+        id: smoke
+        uses: ./
+
+      - name: The smoke test must have completed
+        run: test "${{ steps.smoke.outputs.outcome }}" = "completed"

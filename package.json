@@ -1,0 +1,37 @@
+{
+  "name": "mermaid-preview",
+  "version": "0.0.0",
+  "private": true,
+  "description": "GitHub Action that comments a mermaid.live preview link on every changed mermaid block in a pull request's Markdown",
+  "license": "MIT",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && ncc build build/main.js -o dist --license licenses.txt",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome ci .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "prepare": "lefthook install"
+  },
+  "dependencies": {
+    "@actions/core": "3.0.1",
+    "@actions/github": "9.1.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.14",
+    "@types/node": "^24.13.3",
+    "@vercel/ncc": "0.45.0",
+    "@vitest/coverage-v8": "4.1.11",
+    "lefthook": "2.1.14",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11"
+  },
+  "pnpm": {
+    "ignoredBuiltDependencies": [
+      "lefthook"
+    ]
+  }
+}

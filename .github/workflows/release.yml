@@ -1,0 +1,28 @@
+name: Release
+
+# brianespinosa/release-action: git-cliff computes the next semver from the
+# conventional-commit squash titles since the last tag, creates the GitHub
+# release, and force-moves the vN and vN.M alias tags. It assumes squash-only
+# merges (set on this repository) and runs the Dependabot major-bump title
+# rewrite on pull_request_target.
+#
+# The first Marketplace listing has to be made once by hand: draft a release
+# in the GitHub UI with "Publish this Action to the GitHub Marketplace" ticked.
+# See README.md, Publishing.
+
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    uses: brianespinosa/release-action/.github/workflows/release-workflow.yml@main
+    with:
+      trigger: ${{ github.event_name }}
+    secrets: inherit

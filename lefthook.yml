@@ -1,0 +1,18 @@
+# Staged-only, fast gates. CI is the enforcement boundary; never bypass with
+# --no-verify.
+pre-commit:
+  commands:
+    biome:
+      glob: '*.{json,mts,ts}'
+      run: pnpm exec biome check --staged --error-on-warnings --no-errors-on-unmatched
+    types:
+      glob: '{*.ts,tsconfig*.json}'
+      run: pnpm typecheck
+    vitest-related:
+      glob: 'src/*.ts'
+      run: pnpm exec vitest related --run --coverage.enabled=false --passWithNoTests {staged_files}
+    # dist/ is the shipped artifact and CI refuses a dist that does not match
+    # src, so rebuild and stage it whenever a source or dependency changes.
+    build:
+      glob: '{src/*.ts,package.json,pnpm-lock.yaml}'
+      run: pnpm build && git add dist

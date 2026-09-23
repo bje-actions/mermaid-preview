@@ -1,0 +1,25 @@
+version: 2
+updates:
+  # fix(deps): so a dependency bump releases a patch through
+  # brianespinosa/release-action, which rewrites the title to feat(deps)!: on a
+  # major bump. A bump changes dist/, which is what consumers run, so it is a
+  # release, not a chore.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    rebase-strategy: auto
+    commit-message:
+      prefix: "fix(deps):"
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    rebase-strategy: auto
+    commit-message:
+      prefix: "fix(deps):"
+    ignore:
+      # The action runs on the node24 runtime; keep the types on the same major.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
